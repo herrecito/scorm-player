@@ -41,14 +41,48 @@ class ReadOnlyError extends Error {
 class WriteOnlyError extends Error {
 }
 
+class SimpleElement {
+    constructor(value="") {
+        this.value = value
+    }
+
+    getValue() {
+        return this.value
+    }
+
+    setValue(value) {
+        this.value = value
+    }
+
+    access(path) {
+        if (path.length === 0) {
+            return this
+        } else {
+            return null
+        }
+    }
+
+    export() {
+        return this.value
+    }
+}
+
+class ROSimpleElement extends SimpleElement {
+    setValue() {
+        throw new ReadOnlyError()
+    }
+}
+
 class CMIElement {
     constructor(cmi) {
-        this.version = new VersionElement()
         this.location = new Location(cmi.location)
         this.completionStatus = new CompletionStatus(cmi.completionStatus)
+        this.successStatus = new SuccessStatus(cmi.successStatus)
         this.objectives = new ObjectiveCollection(cmi.objectives)
         this.progressMeasure = new ProgressMeasure(cmi.progressMeasure)
         this.sessionTime = new SessionTime(cmi.sessionTime)
+        this.suspendData = new SuspendData(cmi.suspendData)
+        this.mode = new Mode(cmi.mode)
         this.exit = new ExitElement()
     }
 
@@ -56,13 +90,19 @@ class CMIElement {
         const [name, ...rest] = path
         switch (name) {
             case "_version":
-                return this.version.access(rest, write)
+                return new ROSimpleElement("1.0").access(rest, write)
+
+            case "suspend_data":
+                return this.suspendData.access(rest, write)
 
             case "location":
                 return this.location.access(rest, write)
 
             case "completion_status":
                 return this.completionStatus.access(rest, write)
+
+            case "success_status":
+                return this.successStatus.access(rest, write)
 
             case "objectives":
                 return this.objectives.access(rest, write)
@@ -72,6 +112,9 @@ class CMIElement {
 
             case "exit":
                 return this.exit.access(rest, write)
+
+            case "mode":
+                return this.mode.access(rest, write)
 
             case "session_time":
                 return this.sessionTime.access(rest, write)
@@ -85,85 +128,40 @@ class CMIElement {
         return {
             location: this.location.export(),
             completionStatus: this.completionStatus.export(),
+            successStatus: this.successStatus.export(),
             objectives: this.objectives.export(),
+            suspendData: this.suspendData.export(),
             progressMeasure: this.progressMeasure.export(),
-            exit: this.exit.export()
+            exit: this.exit.export(),
+            mode: this.mode.export(),
+            sessionTime: this.sessionTime.export()
         }
     }
 }
 
-class VersionElement {
-    getValue() {
-        return "1.0"
-    }
+class SuspendData extends SimpleElement {
+}
 
-    setValue() {
-        throw new ReadOnlyError()
-    }
-
-    access(path) {
-        if (path.length === 0) {
-            return this
-        } else {
-            return null
-        }
-    }
-
-    export() {
-        throw new Error()
+class Mode extends ROSimpleElement {
+    constructor(mode="normal") {
+        super(mode)
     }
 }
 
-class CompletionStatus {
-    constructor(completionStatus="") {
-        this.completionStatus = completionStatus
-    }
-
-    getValue() {
-        return this.completionStatus
-    }
-
-    setValue(completionStatus) {
-        this.completionStatus = completionStatus
-    }
-
-    access(path) {
-        if (path.length === 0) {
-            return this
-        } else {
-            return null
-        }
-    }
-
-    export() {
-        return this.completionStatus
+class CompletionStatus extends SimpleElement {
+    constructor(completionStatus="unknown") {
+        super(completionStatus)
     }
 }
 
-class Location {
-    constructor(location="") {
-        this.location = location
+class SuccessStatus extends SimpleElement {
+    constructor(successStatus="unknown") {
+        super(successStatus)
     }
+}
 
-    getValue() {
-        return this.location
-    }
-
-    setValue(location) {
-        this.location = location
-    }
-
-    access(path) {
-        if (path.length === 0) {
-            return this
-        } else {
-            return null
-        }
-    }
-
-    export() {
-        return this.location
-    }
+class Location extends SimpleElement {
+    // TODO throw 403 if not initialized
 }
 
 class ObjectiveCollection {
@@ -183,7 +181,7 @@ class ObjectiveCollection {
         const [name, ...rest] = path
         switch (name) {
             case "_count": {
-                return new CountElement(this.objectives.length.toString())
+                return new ROSimpleElement(this.objectives.length.toString()).access(rest, write)
             }
             default: {
                 const index = parseInt(name, 10)
@@ -194,32 +192,6 @@ class ObjectiveCollection {
 
     export() {
         return this.objectives.map(o => o.export())
-    }
-}
-
-class CountElement {
-    constructor(count) {
-        this.count = count
-    }
-
-    getValue() {
-        return this.count
-    }
-
-    setValue() {
-        throw new ReadOnlyError
-    }
-
-    access(path) {
-        if (path.length === 0) {
-            return this
-        } else {
-            return null
-        }
-    }
-
-    export() {
-        throw new Error()
     }
 }
 
@@ -257,189 +229,106 @@ class Objective {
     }
 }
 
-class ObjectiveId {
-    constructor(id) {
-        this.id = id
-    }
-
-    getValue() {
-        return this.id
-    }
-
-    setValue(id) {
-        this.id = id
-    }
-
-    access(path) {
-        if (path.length === 0) {
-            return this
-        } else {
-            return null
-        }
-    }
-
-    export() {
-        return this.id
-    }
+class ObjectiveId extends SimpleElement {
 }
 
-class ProgressMeasure {
-    constructor(progressMeasure) {
-        this.progressMeasure = progressMeasure
-    }
-
-    getValue() {
-        return this.progressMeasure
-    }
-
-    setValue(progressMeasure) {
-        this.progressMeasure = progressMeasure
-    }
-
-    access(path) {
-        if (path.length === 0) {
-            return this
-        } else {
-            return null
-        }
-    }
-
-    export() {
-        return this.progressMeasure
-    }
+class ProgressMeasure extends SimpleElement {
 }
 
-class ExitElement {
-    constructor(exit="") {
-        this.exit = exit
-    }
-
+class ExitElement extends SimpleElement {
     getValue() {
         throw new WriteOnlyError()
     }
-
-    setValue(exit) {
-        this.exit = exit
-    }
-
-    access(path) {
-        if (path.length === 0) {
-            return this
-        } else {
-            return null
-        }
-    }
-
-    export() {
-        return this.exit
-    }
 }
 
-class SessionTime {
-    constructor(sessionTime) {
-        this.sessionTime = sessionTime
-    }
-
-    getValue() {
-        return this.sessionTime
-    }
-
-    setValue(sessionTime) {
-        this.sessionTime = sessionTime
-    }
-
-    access(path) {
-        if (path.length === 0) {
-            return this
-        } else {
-            return null
-        }
-    }
-
-    export() {
-        return this.sessionTime
-    }
+class SessionTime extends SimpleElement {
 }
+
 
 export default class API {
+    #emitter = createNanoEvents()
+
     constructor(cmi={}) {
         this.state = "not-initialized" // "not-initialized" | "running" | "terminated"
         this.errorCode = NoError
         this.cmi = new CMIElement(cmi)
-        this.emitter = createNanoEvents()
     }
 
     on(event, callback) {
-        return this.emitter.on(event, callback)
+        return this.#emitter.on(event, callback)
+    }
+
+    #emit(...args) {
+        return this.#emitter.emit(...args)
     }
 
     #setErrorCode(errorCode) {
-        this.emitter.emit("error-code", errorCode)
+        this.#emit("error-code", errorCode)
         this.errorCode = errorCode
     }
 
     Initialize(param) {
         if (param !== "") {
             this.#setErrorCode(GeneralArgumentError)
-            this.emitter.emit("call", "Initialize", [param], "false", true)
+            this.#emit("call", "Initialize", [param], "false", true)
             return "false"
         }
 
         if (this.state === "running") {
             this.#setErrorCode(AlreadyInitialized)
-            this.emitter.emit("call", "Initialize", [param], "false", true)
+            this.#emit("call", "Initialize", [param], "false", true)
             return "false"
         }
 
         if (this.state === "terminated") {
             this.#setErrorCode(ContentInstanceTerminated)
-            this.emitter.emit("call", "Initialize", [param], "false", true)
+            this.#emit("call", "Initialize", [param], "false", true)
             return "false"
         }
 
         this.state = "running"
         this.#setErrorCode(NoError)
-        this.emitter.emit("call", "Initialize", [param], "true")
+        this.#emit("call", "Initialize", [param], "true")
         return "true"
     }
 
     Terminate(param) {
         if (param !== "") {
             this.#setErrorCode(GeneralArgumentError)
-            this.emitter.emit("call", "Terminate", [param], "false", true)
+            this.#emit("call", "Terminate", [param], "false", true)
             return "false"
         }
 
         if (this.state === "not-initialized") {
             this.#setErrorCode(TerminationBeforeInitialization)
-            this.emitter.emit("call", "Terminate", [param], "false", true)
+            this.#emit("call", "Terminate", [param], "false", true)
             return "false"
         }
 
         if (this.state === "terminated") {
             this.#setErrorCode(TerminationAfterTermination)
-            this.emitter.emit("call", "Terminate", [param], "false", true)
+            this.#emit("call", "Terminate", [param], "false", true)
             return "false"
         }
 
-        this.emitter.emit("persist", this.cmi.export())
+        this.#emit("persist", this.cmi.export())
 
         this.state = "terminated"
         this.#setErrorCode(NoError)
-        this.emitter.emit("call", "Terminate", [param], "true")
+        this.#emit("call", "Terminate", [param], "true")
         return "true"
     }
 
     GetValue(element) {
         if (this.state === "not-initialized") {
             this.#setErrorCode(RetrieveDataBeforeInitialization)
-            this.emitter.emit("call", "GetValue", [element], "", true)
+            this.#emit("call", "GetValue", [element], "", true)
             return ""
         }
 
         if (this.state === "terminated") {
             this.#setErrorCode(RetrieveDataAfterTermination)
-            this.emitter.emit("call", "GetValue", [element], "", true)
+            this.#emit("call", "GetValue", [element], "", true)
             return ""
         }
 
@@ -449,31 +338,30 @@ export default class API {
             if (modelElement) {
                 const value = modelElement.getValue()
                 this.#setErrorCode(NoError)
-                this.emitter.emit("call", "GetValue", [element], value)
+                this.#emit("call", "GetValue", [element], value)
                 return value
             } else {
                 this.#setErrorCode(UndefinedDataModelElement)
-                this.emitter.emit("call", "GetValue", [element], "", true)
+                this.#emit("call", "GetValue", [element], "", true)
                 return ""
             }
         } else {
             this.#setErrorCode(UndefinedDataModelElement)
-            this.emitter.emit("call", "GetValue", [element], "", true)
+            this.#emit("call", "GetValue", [element], "", true)
             return ""
         }
     }
 
-    // string
     SetValue(element, value) {
         if (this.state === "not-initialized") {
             this.#setErrorCode(StoreDataBeforeTermination)
-            this.emitter.emit("call", "SetValue", [element, value], "false", true)
+            this.#emit("call", "SetValue", [element, value], "false", true)
             return "false"
         }
 
         if (this.state === "terminated") {
             this.#setErrorCode(StoreDataAfterTermination)
-            this.emitter.emit("call", "SetValue", [element, value], "false", true)
+            this.#emit("call", "SetValue", [element, value], "false", true)
             return "false"
         }
 
@@ -484,12 +372,12 @@ export default class API {
                 try {
                     modelElement.setValue(value)
                     this.#setErrorCode(NoError)
-                    this.emitter.emit("call", "SetValue", [element, value], "true")
+                    this.#emit("call", "SetValue", [element, value], "true")
                     return "true"
                 } catch (error) {
                     if (error instanceof ReadOnlyError) {
                         this.#setErrorCode(DataModelElementIsReadOnly)
-                        this.emitter.emit("call", "SetValue", [element, value], "false", true)
+                        this.#emit("call", "SetValue", [element, value], "false", true)
                         return "false"
                     } else {
                         throw error
@@ -497,12 +385,12 @@ export default class API {
                 }
             } else {
                 this.#setErrorCode(UndefinedDataModelElement)
-                this.emitter.emit("call", "SetValue", [element, value], "false", true)
+                this.#emit("call", "SetValue", [element, value], "false", true)
                 return "false"
             }
         } else {
             this.#setErrorCode(UndefinedDataModelElement)
-            this.emitter.emit("call", "SetValue", [element, value], "false", true)
+            this.#emit("call", "SetValue", [element, value], "false", true)
             return "false"
         }
     }
@@ -510,37 +398,37 @@ export default class API {
     Commit(param) {
         if (param !== "") {
             this.#setErrorCode(GeneralArgumentError)
-            this.emitter.emit("call", "Commit", [param], "false", true)
+            this.#emit("call", "Commit", [param], "false", true)
             return "false"
         }
 
         if (this.state === "not-initialized") {
             this.#setErrorCode(CommitBeforeInitialization)
-            this.emitter.emit("call", "Commit", [param], "false", true)
+            this.#emit("call", "Commit", [param], "false", true)
             return "false"
         }
 
         if (this.state === "terminated") {
             this.#setErrorCode(CommitAfterTermination)
-            this.emitter.emit("call", "Commit", [param], "false", true)
+            this.#emit("call", "Commit", [param], "false", true)
             return "false"
         }
 
-        this.emitter.emit("persist", this.cmi.export())
+        this.#emit("persist", this.cmi.export())
 
         this.#setErrorCode(NoError)
-        this.emitter.emit("call", "Commit", [param], "true")
+        this.#emit("call", "Commit", [param], "true")
         return "true"
     }
 
     GetLastError() {
-        this.emitter.emit("call", "GetLastError", [], this.errorCode)
+        this.#emit("call", "GetLastError", [], this.errorCode)
 
         return this.errorCode
     }
 
     GetErrorString(errorCode) {
-        this.emitter.emit("call", "GetErrorString", [errorCode], "")
+        this.#emit("call", "GetErrorString", [errorCode], "")
 
         switch (errorCode) {
             case NoError:
@@ -616,10 +504,10 @@ export default class API {
                 return "DataModelElementTypeMismatch"
 
             case DataModelElementValueOutOfRange:
-                return "DataModelElementValueOutOfRange"
+                return "Data Model Element Value Out Of Range"
 
             case DataModelDependencyNotEstablished:
-                return "DataModelDependencyNotEstablished"
+                return "Data Model Dependency Not Established"
 
             default:
                 return `Unknown error code: ${errorCode}`
@@ -627,7 +515,7 @@ export default class API {
     }
 
     GetDiagnostic(errorCode) {
-        this.emitter.emit("call", "GetDiagnostic", [errorCode], "")
+        this.#emit("call", "GetDiagnostic", [errorCode], "")
 
         return ""
     }

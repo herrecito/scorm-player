@@ -1,6 +1,6 @@
 <template>
     <div class="h-screen flex">
-        <div class="flex flex-col">
+        <div class="flex flex-col max-w-sm">
             <form
                 class="p-4 flex"
                 @submit.prevent="onSubmit"
@@ -180,6 +180,7 @@ export default {
             window.API_1484_11 = api
 
             this.iframeSrc = href
+            this.log = []
 
             await reader.close()
         }
