@@ -177,7 +177,7 @@ export default class API {
         }
 
         switch (element) {
-            case "cmi.completionStatus": {
+            case "cmi.completion_status": {
                 this.cmi.completionStatus = value
                 return "true"
                 break
