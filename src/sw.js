@@ -24,7 +24,7 @@ self.addEventListener("message", event => {
 })
 
 self.addEventListener("fetch", event => {
-    event.respondWith(caches.match(event.request).then(response => {
+    event.respondWith(caches.match(event.request, { ignoreSearch: true }).then(response => {
         if (response) {
             return response
         } else {

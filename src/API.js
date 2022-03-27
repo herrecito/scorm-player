@@ -1,14 +1,8 @@
-// No error             0
-// General Errors       100 - 199
-// Syntax Errors        200 - 299
-// RTS Errors           300 - 399
-// Data Model Errors    400 - 499
-// Implentation-defined 1000 - 65535
-
 import { createNanoEvents } from "nanoevents"
 
 const NoError = "0"
 
+// General Errors [100 - 199]
 const GeneralException = "101"
 const GeneralInitializationFailure = "102"
 const AlreadyInitialized = "103"
@@ -23,12 +17,15 @@ const StoreDataAfterTermination = "133"
 const CommitBeforeInitialization = "142"
 const CommitAfterTermination = "143"
 
+// Syntax Errors [200 - 299]
 const GeneralArgumentError = "201"
 
+// RTS (LMS) Errors [300 - 399]
 const GeneralGetFailure = "301"
 const GeneralSetFailure = "351"
 const GeneralCommitFailure = "391"
 
+// Data Model Errors [400 - 499]
 const UndefinedDataModelElement = "401"
 const UnimplementedDataModelElement = "402"
 const DataModelElementValueNotInitialized = "403"
