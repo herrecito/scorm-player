@@ -1,14 +1,24 @@
 <template>
-    <div class="h-screen flex flex-col">
-        <div class="mb-4 p-4">
-            <input
-                type="file"
-                @change="onChange"
-            />
+    <div class="h-screen flex">
+        <div class="flex flex-col">
+            <form
+                class="mb-4 p-4 flex"
+                @submit.prevent="onSubmit"
+            >
+                <input
+                    ref="inputFile"
+                    type="file"
+                />
+
+                <button class="ml-2 border border-black px-2 py-1">
+                    Upload
+                </button>
+            </form>
         </div>
 
         <iframe
             v-if="iframeSrc"
+            :key="iframeKey"
             class="grow"
             :src="iframeSrc"
         />
@@ -20,16 +30,71 @@ import * as zip from "@zip.js/zip.js"
 
 import API from "./API.js"
 
+function manifest2cmi(manifest) {
+    const organizations = manifest.querySelector("organizations")
+    const defaultOrganizationId = organizations.getAttribute("default")
+
+    const defaultOrganization = organizations.querySelector(
+        `organization[identifier=${defaultOrganizationId}]`)
+
+    // TODO no multi-sco support
+    const item = defaultOrganization.querySelector("item")
+
+    const oids = []
+    const imsssObjectives = item.querySelector("objectives")
+
+    const objectives = imsssObjectives.querySelectorAll("objective")
+    for (const objective of objectives) {
+        const oid = objective.getAttribute("objectiveID")
+        oids.push(oid)
+    }
+
+    return {
+        objectives: oids.map(id => ({ id }))
+    }
+}
+
+function manifest2hrefs(manifest) {
+    const organizations = manifest.querySelector("organizations")
+    const defaultOrganizationId = organizations.getAttribute("default")
+
+    const defaultOrganization = organizations.querySelector(
+        `organization[identifier=${defaultOrganizationId}]`)
+
+    // TODO no multi-sco support
+    const item = defaultOrganization.querySelector("item")
+
+    const resourceId = item.getAttribute("identifierref")
+
+    const resources = manifest.querySelector("resources")
+    const resource = resources.querySelector(`resource[identifier=${resourceId}]`)
+
+    const href = resource.getAttribute("href")
+    const files = resource.querySelectorAll("file")
+
+    return [href, Array.from(files).map(file => file.getAttribute("href"))]
+}
+
+async function sha256(uint8Array) {
+    const hashBuffer = await crypto.subtle.digest("SHA-256", uint8Array)
+    const hashArray = Array.from(new Uint8Array(hashBuffer))
+    return hashArray.map(b => b.toString(16).padStart(2, "0")).join("")
+}
+
 export default {
     data() {
         return {
-            iframeSrc: "",
+            iframeSrc: ""
         }
     },
 
     methods: {
-        async onChange(event) {
-            const file = event.target.files[0]
+        async onSubmit() {
+            const file = this.$refs.inputFile.files[0]
+            if (!file) return
+
+            const data = await file.arrayBuffer()
+
             const reader = new zip.ZipReader(new zip.BlobReader(file))
 
             const entries = await reader.getEntries()
@@ -42,81 +107,51 @@ export default {
             const parser = new DOMParser()
             const imsManifest = parser.parseFromString(imsManifestText, "text/xml")
 
-            console.log(imsManifest)
+            // TODO
+            const [href, hrefs] = manifest2hrefs(imsManifest)
+            await Promise.all(hrefs.map(async href => {
+                const entry = entries.find(e => e.filename === href)
+                const data = await entry.getData(new zip.Uint8ArrayWriter)
 
-            const organizations = imsManifest.querySelector("organizations")
-            const defaultOrganizationId = organizations.getAttribute("default")
+                await navigator.serviceWorker.ready.then(registration => {
+                    registration.active.postMessage({
+                        type: "put",
+                        url: href,
+                        body: data
+                    }, [data.buffer])
+                })
+            }))
 
-            console.log(defaultOrganizationId)
+            const state = window.localStorage.getItem(`${file.name}-state`)
+            const cmi = state ? JSON.parse(state) : manifest2cmi(imsManifest)
 
-            const defaultOrganization = organizations.querySelector(`organization[identifier=${defaultOrganizationId}]`)
-            console.log(defaultOrganization)
+            const api = new API(cmi)
 
-            // TODO no multi-sco support
-            const item = defaultOrganization.querySelector("item")
-            console.log(item)
+            api.on("call", (fn, ...args) => {
+                console.log(fn, ...args)
 
-            const oids = []
-
-            const imsssObjectives = item.querySelector("objectives")
-            {
-                const objectives = imsssObjectives.querySelectorAll("objective")
-                for (const objective of objectives) {
-                    const oid = objective.getAttribute("objectiveID")
-                    oids.push(oid)
-                }
-            }
-            console.log("oids", oids)
-
-            const resourceId = item.getAttribute("identifierref")
-
-            const resources = imsManifest.querySelector("resources")
-            const resource = resources.querySelector(`resource[identifier=${resourceId}]`)
-
-            {
-                const href = resource.getAttribute("href")
-                const files = resource.querySelectorAll("file")
-                for await (const file of files) {
-                    const href = file.getAttribute("href")
-                    const entry = entries.find(e => e.filename === href)
-                    const ary = await entry.getData(new zip.Uint8ArrayWriter)
-
-                    await navigator.serviceWorker.ready.then(registration => {
-                        registration.active.postMessage({
-                            type: "put",
-                            url: href,
-                            body: ary
-                        }, [ary.buffer])
+                if (fn === "Terminate") {
+                    setTimeout(() => {
+                        this.iframeSrc = null
                     })
                 }
+            })
 
-                const state = window.localStorage.getItem("state")
-                const cmi = state ? JSON.parse(state) : {
-                    objectives: oids.map(id => ({ id }))
-                }
+            api.on("error-code", (errorCode) => {
+                if (errorCode === "0") return
 
-                const api = new API(cmi)
+                console.log("error-code", errorCode, api.GetErrorString(errorCode))
+            })
 
-                api.on("call", (...args) => {
-                    console.log(...args)
-                })
+            api.on("persist", cmi => {
+                console.log("persist", cmi)
 
-                api.on("error-code", (errorCode) => {
-                    if (errorCode === "0") return
+                window.localStorage.setItem(`${file.name}-state`, JSON.stringify(cmi))
+            })
 
-                    console.log("error-code", errorCode, api.GetErrorString(errorCode))
-                })
+            window.API_1484_11 = api
 
-                api.on("persist", cmi => {
-                    console.log("persist", cmi)
-
-                    window.localStorage.setItem("state", JSON.stringify(cmi))
-                })
-
-                window.API_1484_11 = api
-
-                this.iframeSrc = href
-            }
+            this.iframeSrc = href
 
             await reader.close()
         }

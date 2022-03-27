@@ -97,7 +97,7 @@ class VersionElement {
         return "1.0"
     }
 
-    setValue(value) {
+    setValue() {
         throw new ReadOnlyError()
     }
 
@@ -175,7 +175,7 @@ class ObjectiveCollection {
         throw new Error()
     }
 
-    setValue(value) {
+    setValue() {
         throw new Error()
     }
 
@@ -210,7 +210,7 @@ class CountElement {
         throw new ReadOnlyError
     }
 
-    access(path, write) {
+    access(path) {
         if (path.length === 0) {
             return this
         } else {
@@ -234,7 +234,7 @@ class Objective {
         throw new Error()
     }
 
-    setValue(value) {
+    setValue() {
         throw new Error()
     }
 
@@ -270,7 +270,7 @@ class ObjectiveId {
         this.id = id
     }
 
-    access(path, write) {
+    access(path) {
         if (path.length === 0) {
             return this
         } else {
@@ -285,7 +285,7 @@ class ObjectiveId {
 
 class ProgressMeasure {
     constructor(progressMeasure) {
-        this.progressMeasure = this.progressMeasure
+        this.progressMeasure = progressMeasure
     }
 
     getValue() {
@@ -296,7 +296,7 @@ class ProgressMeasure {
         this.progressMeasure = progressMeasure
     }
 
-    access(path, write) {
+    access(path) {
         if (path.length === 0) {
             return this
         } else {
@@ -322,7 +322,7 @@ class ExitElement {
         this.exit = exit
     }
 
-    access(path, write) {
+    access(path) {
         if (path.length === 0) {
             return this
         } else {
@@ -348,7 +348,7 @@ class SessionTime {
         this.sessionTime = sessionTime
     }
 
-    access(path, write) {
+    access(path) {
         if (path.length === 0) {
             return this
         } else {

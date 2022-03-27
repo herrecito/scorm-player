@@ -2,8 +2,7 @@ import { dirname, resolve } from "path"
 import { fileURLToPath } from "url"
 
 import { VueLoaderPlugin } from "vue-loader"
-
-
+import ESLintPlugin from "eslint-webpack-plugin"
 import HtmlWebpackPlugin from "html-webpack-plugin"
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -44,6 +43,7 @@ export default {
             template: "./src/index.html",
             chunks: ["main"]
         }),
-        new VueLoaderPlugin()
+        new VueLoaderPlugin(),
+        new ESLintPlugin()
     ],
 }
