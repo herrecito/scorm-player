@@ -42,16 +42,13 @@ export default class API {
         const { objectives=[] } = cmi
 
         this.state = "not-initialized" // "not-initialized" | "running" | "terminated"
-
-        this.cmi = {
-            version: "1.0"
-        }
-
         this.errorCode = NoError
 
-        this.completionStatus = "unknown"
-        this.location = ""
-        this.objectives = objectives
+        this.cmi = {
+            location: "",
+            objectives: objectives,
+            completionStatus: "unknown"
+        }
     }
 
     Initialize(param) {
@@ -112,24 +109,37 @@ export default class API {
         }
 
         let value = ""
-        switch (element) {
-            case "cmi.completion_status": {
-                value = this.completionStatus
-                break
-            }
 
-            case "cmi.objectives._count": {
-                value = this.objectives.length.toString()
-                break
-            }
+        const result = /cmi\.objectives\.(\d+)\.id/.exec(element)
+        if (result) {
+            let idx = result[1]
+            idx = parseInt(idx, 10)
+            value = this.cmi.objectives[idx].id
+        } else {
+            switch (element) {
+                case "cmi._version": {
+                    value = "1.0"
+                    break
+                }
 
-            case "cmi.location": {
-                value = this.location
-                break
-            }
+                case "cmi.completion_status": {
+                    value = this.cmi.completionStatus
+                    break
+                }
 
-            default:
-                // NOP
+                case "cmi.objectives._count": {
+                    value = this.cmi.objectives.length.toString()
+                    break
+                }
+
+                case "cmi.location": {
+                    value = this.cmi.location
+                    break
+                }
+
+                default:
+                    // NOP
+            }
         }
 
         console.log("GetValue", element, value)
@@ -143,11 +153,11 @@ export default class API {
 
         switch (element) {
             case "cmi.completionStatus": {
-                this.completionStatus = value
+                this.cmi.completionStatus = value
             }
 
             case "cmi.location": {
-                this.location = value
+                this.cmi.location = value
             }
         }
     }

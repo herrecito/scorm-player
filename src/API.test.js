@@ -88,3 +88,35 @@ describe("API", () => {
         })
     })
 })
+
+describe("Data Model", () => {
+    describe("Data Model Version", () => {
+        it("returns the value defined by the standard", () => {
+            const api = new API()
+            api.Initialize("")
+
+            const value = api.GetValue("cmi._version")
+
+            assert.strictEqual(value, "1.0")
+        })
+
+        it("is read-only")
+    })
+
+    describe("Objectives", () => {
+        it("TODO", () => {
+            const cmi = {
+                objectives: [
+                    { id: "obj1" },
+                    { id: "obj2" },
+                    { id: "obj3" }
+                ]
+            }
+            const api = new API(cmi)
+            api.Initialize("")
+
+            assert.strictEqual(api.GetValue("cmi.objectives._count"), "3")
+            assert.strictEqual(api.GetValue("cmi.objectives.1.id"), "obj2")
+        })
+    })
+})
