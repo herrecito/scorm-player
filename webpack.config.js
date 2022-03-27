@@ -26,7 +26,16 @@ export default {
             {
                 test: /\.vue$/,
                 loader: "vue-loader"
-            }
+            },
+
+            {
+                test: /\.css$/i,
+                use: [
+                    "style-loader",
+                    "css-loader",
+                    "postcss-loader"
+                ],
+            },
         ]
     },
 
