@@ -14,15 +14,18 @@
                     Upload
                 </button>
             </form>
-            <div>
+            <div class="overflow-x-auto">
                 <div
                     v-for="entry in log"
                     :key="entry.key"
                     class="text-xs font-mono px-1 truncate"
-                    :class="entry.klass"
-                    :title="entry.message"
+                    :class="entryKlass(entry)"
                 >
-                    {{ entry.message }}
+                    {{ entry.functionName }}
+                    {{ entry.args.map(a => a.toString()).join(" ") }}
+                    <div class="pl-2">
+                        {{ entry.returnValue !== "" ? entry.returnValue : "&nbsp;" }}
+                    </div>
                 </div>
             </div>
         </div>
@@ -93,16 +96,6 @@ async function sha256(uint8Array) {
     return hashArray.map(b => b.toString(16).padStart(2, "0")).join("")
 }
 
-function entryKlass(fn) {
-    switch (fn) {
-        case "Initialize": return "text-green-700"
-        case "Terminate": return "text-purple-700"
-        case "GetLastError": return "text-red-700"
-        case "Commit": return "font-bold"
-        default: return "text-gray-700"
-    }
-}
-
 export default {
     data() {
         return {
@@ -112,6 +105,14 @@ export default {
     },
 
     methods: {
+        entryKlass(entry) {
+            if (entry.isError) {
+                return "font-bold text-red-700"
+            } else {
+                return "text-gray-700"
+            }
+        },
+
         async onSubmit() {
             const file = this.$refs.inputFile.files[0]
             if (!file) return
@@ -150,11 +151,13 @@ export default {
 
             const api = new API(cmi)
 
-            api.on("call", (fn, ...args) => {
+            api.on("call", (fn, args, returnValue, isError) => {
                 this.log.unshift({
                     key: uniqueId(),
-                    message: `${fn} ${args.map(arg => arg.toString()).join(" ")}`,
-                    klass: entryKlass(fn)
+                    functionName: fn,
+                    args,
+                    returnValue,
+                    isError
                 })
 
                 if (fn === "Terminate") {
@@ -171,8 +174,6 @@ export default {
             })
 
             api.on("persist", cmi => {
-                console.log("persist", cmi)
-
                 window.localStorage.setItem(`${file.name}-state`, JSON.stringify(cmi))
             })
 

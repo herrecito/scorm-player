@@ -115,7 +115,7 @@ class VersionElement {
 }
 
 class CompletionStatus {
-    constructor(completionStatus) {
+    constructor(completionStatus="") {
         this.completionStatus = completionStatus
     }
 
@@ -379,43 +379,46 @@ export default class API {
     }
 
     Initialize(param) {
-        this.emitter.emit("call", "Initialize", param)
-
         if (param !== "") {
             this.#setErrorCode(GeneralArgumentError)
+            this.emitter.emit("call", "Initialize", [param], "false", true)
             return "false"
         }
 
         if (this.state === "running") {
             this.#setErrorCode(AlreadyInitialized)
+            this.emitter.emit("call", "Initialize", [param], "false", true)
             return "false"
         }
 
         if (this.state === "terminated") {
             this.#setErrorCode(ContentInstanceTerminated)
+            this.emitter.emit("call", "Initialize", [param], "false", true)
             return "false"
         }
 
         this.state = "running"
         this.#setErrorCode(NoError)
+        this.emitter.emit("call", "Initialize", [param], "true")
         return "true"
     }
 
     Terminate(param) {
-        this.emitter.emit("call", "Terminate", param)
-
         if (param !== "") {
             this.#setErrorCode(GeneralArgumentError)
+            this.emitter.emit("call", "Terminate", [param], "false", true)
             return "false"
         }
 
         if (this.state === "not-initialized") {
             this.#setErrorCode(TerminationBeforeInitialization)
+            this.emitter.emit("call", "Terminate", [param], "false", true)
             return "false"
         }
 
         if (this.state === "terminated") {
             this.#setErrorCode(TerminationAfterTermination)
+            this.emitter.emit("call", "Terminate", [param], "false", true)
             return "false"
         }
 
@@ -423,64 +426,70 @@ export default class API {
 
         this.state = "terminated"
         this.#setErrorCode(NoError)
+        this.emitter.emit("call", "Terminate", [param], "true")
         return "true"
     }
 
     GetValue(element) {
-        this.emitter.emit("call", "GetValue", element)
-
         if (this.state === "not-initialized") {
             this.#setErrorCode(RetrieveDataBeforeInitialization)
+            this.emitter.emit("call", "GetValue", [element], "", true)
             return ""
         }
 
         if (this.state === "terminated") {
             this.#setErrorCode(RetrieveDataAfterTermination)
+            this.emitter.emit("call", "GetValue", [element], "", true)
             return ""
         }
 
         const [name, ...rest] = element.split(".")
         if (name === "cmi") {
-            const element = this.cmi.access(rest, false)
-            if (element) {
-                const value = element.getValue()
+            const modelElement = this.cmi.access(rest, false)
+            if (modelElement) {
+                const value = modelElement.getValue()
                 this.#setErrorCode(NoError)
+                this.emitter.emit("call", "GetValue", [element], value)
                 return value
             } else {
                 this.#setErrorCode(UndefinedDataModelElement)
+                this.emitter.emit("call", "GetValue", [element], "", true)
                 return ""
             }
         } else {
             this.#setErrorCode(UndefinedDataModelElement)
+            this.emitter.emit("call", "GetValue", [element], "", true)
             return ""
         }
     }
 
     // string
     SetValue(element, value) {
-        this.emitter.emit("call", "SetValue", element, value)
-
         if (this.state === "not-initialized") {
             this.#setErrorCode(StoreDataBeforeTermination)
+            this.emitter.emit("call", "SetValue", [element, value], "false", true)
             return "false"
         }
 
         if (this.state === "terminated") {
             this.#setErrorCode(StoreDataAfterTermination)
+            this.emitter.emit("call", "SetValue", [element, value], "false", true)
             return "false"
         }
 
         const [name, ...rest] = element.split(".")
         if (name === "cmi") {
-            const element = this.cmi.access(rest, false)
-            if (element) {
+            const modelElement = this.cmi.access(rest, false)
+            if (modelElement) {
                 try {
-                    element.setValue(value)
+                    modelElement.setValue(value)
                     this.#setErrorCode(NoError)
+                    this.emitter.emit("call", "SetValue", [element, value], "true")
                     return "true"
                 } catch (error) {
                     if (error instanceof ReadOnlyError) {
                         this.#setErrorCode(DataModelElementIsReadOnly)
+                        this.emitter.emit("call", "SetValue", [element, value], "false", true)
                         return "false"
                     } else {
                         throw error
@@ -488,46 +497,50 @@ export default class API {
                 }
             } else {
                 this.#setErrorCode(UndefinedDataModelElement)
+                this.emitter.emit("call", "SetValue", [element, value], "false", true)
                 return "false"
             }
         } else {
             this.#setErrorCode(UndefinedDataModelElement)
+            this.emitter.emit("call", "SetValue", [element, value], "false", true)
             return "false"
         }
     }
 
     Commit(param) {
-        this.emitter.emit("call", "Commit", param)
-
         if (param !== "") {
             this.#setErrorCode(GeneralArgumentError)
+            this.emitter.emit("call", "Commit", [param], "false", true)
             return "false"
         }
 
         if (this.state === "not-initialized") {
             this.#setErrorCode(CommitBeforeInitialization)
+            this.emitter.emit("call", "Commit", [param], "false", true)
             return "false"
         }
 
         if (this.state === "terminated") {
             this.#setErrorCode(CommitAfterTermination)
+            this.emitter.emit("call", "Commit", [param], "false", true)
             return "false"
         }
 
         this.emitter.emit("persist", this.cmi.export())
 
         this.#setErrorCode(NoError)
+        this.emitter.emit("call", "Commit", [param], "true")
         return "true"
     }
 
     GetLastError() {
-        this.emitter.emit("call", "GetLastError")
+        this.emitter.emit("call", "GetLastError", [], this.errorCode)
 
         return this.errorCode
     }
 
     GetErrorString(errorCode) {
-        this.emitter.emit("call", "GetErrorString", errorCode)
+        this.emitter.emit("call", "GetErrorString", [errorCode], "")
 
         switch (errorCode) {
             case NoError:
@@ -614,7 +627,7 @@ export default class API {
     }
 
     GetDiagnostic(errorCode) {
-        this.emitter.emit("call", "GetDiagnostic", errorCode)
+        this.emitter.emit("call", "GetDiagnostic", [errorCode], "")
 
         return ""
     }
