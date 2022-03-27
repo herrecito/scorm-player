@@ -79,7 +79,7 @@ input.addEventListener("change", async event => {
         api.on("error-code", (errorCode) => {
             if (errorCode === "0") return
 
-            console.log("error-code", errorCode)
+            console.log("error-code", errorCode, api.GetErrorString(errorCode))
         })
 
         window.API_1484_11 = api

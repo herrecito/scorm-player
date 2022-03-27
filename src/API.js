@@ -226,12 +226,93 @@ export default class API {
     GetErrorString(errorCode) {
         this.emitter.emit("call", "GetErrorString", errorCode)
 
-        return "" // TODO
+        switch (errorCode) {
+            case NoError:
+                return "No Error"
+
+            case GeneralException:
+                return "General Exception"
+
+            case GeneralInitializationFailure:
+                return "General Initialization Failure"
+
+            case AlreadyInitialized:
+                return "Already Initialized"
+
+            case ContentInstanceTerminated:
+                return "Content Instance Terminated"
+
+            case GeneralTerminationFailure:
+                return "General Termination Failure"
+
+            case TerminationBeforeInitialization:
+                return "Termination Before Initialization"
+
+            case TerminationAfterTermination:
+                return "Termination After Termination"
+
+            case RetrieveDataBeforeInitialization:
+                return "Retrieve Data Before Initialization"
+
+            case RetrieveDataAfterTermination:
+                return "Retrieve Data After Termination"
+
+            case StoreDataBeforeTermination:
+                return "Store Data Before Termination"
+
+            case StoreDataAfterTermination:
+                return "Store Data After Termination"
+
+            case CommitBeforeInitialization:
+                return "Commit Before Initialization"
+
+            case CommitAfterTermination:
+                return "Commit After Termination"
+
+            case GeneralArgumentError:
+                return "General Argument Error"
+
+            case GeneralGetFailure:
+                return "General Get Failure"
+
+            case GeneralSetFailure:
+                return "General Set Failure"
+
+            case GeneralCommitFailure:
+                return "General Commit Failure"
+
+            case UndefinedDataModelElement:
+                return "Undefined Data Model Element"
+
+            case UnimplementedDataModelElement:
+                return "UnimplementedDataModelElement"
+
+            case DataModelElementValueNotInitialized:
+                return "DataModelElementValueNotInitialized"
+
+            case DataModelElementIsReadOnly:
+                return "DataModelElementIsReadOnly"
+
+            case DataModelElementIsWriteOnly:
+                return "DataModelElementIsWriteOnly"
+
+            case DataModelElementTypeMismatch:
+                return "DataModelElementTypeMismatch"
+
+            case DataModelElementValueOutOfRange:
+                return "DataModelElementValueOutOfRange"
+
+            case DataModelDependencyNotEstablished:
+                return "DataModelDependencyNotEstablished"
+
+            default:
+                return `Unknown error code: ${errorCode}`
+        }
     }
 
     GetDiagnostic(errorCode) {
         this.emitter.emit("call", "GetDiagnostic", errorCode)
 
-        return "" // TODO
+        return ""
     }
 }
