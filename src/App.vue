@@ -133,6 +133,8 @@ export default {
 
             // TODO
             const [href, hrefs] = manifest2hrefs(imsManifest)
+            // TODO isEazy SCORMs don't list all files on the manifest
+            /*
             await Promise.all(hrefs.map(async href => {
                 const entry = entries.find(e => e.filename === href)
                 const data = await entry.getData(new zip.Uint8ArrayWriter)
@@ -141,6 +143,20 @@ export default {
                     registration.active.postMessage({
                         type: "put",
                         url: href,
+                        body: data
+                    }, [data.buffer])
+                })
+            }))
+            */
+            await Promise.all(entries.map(async entry => {
+                if (entry.directory) return
+
+                const data = await entry.getData(new zip.Uint8ArrayWriter)
+
+                await navigator.serviceWorker.ready.then(registration => {
+                    registration.active.postMessage({
+                        type: "put",
+                        url: entry.filename,
                         body: data
                     }, [data.buffer])
                 })

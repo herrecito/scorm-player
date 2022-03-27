@@ -41,12 +41,20 @@ class ReadOnlyError extends Error {
 class WriteOnlyError extends Error {
 }
 
+class TypeMismatchError extends Error {
+}
+
+class ValueNotInitializederror extends Error {
+}
+
 class SimpleElement {
-    constructor(value="") {
+    constructor(value) {
         this.value = value
     }
 
     getValue() {
+        if (this.value === undefined) throw new ValueNotInitializederror()
+
         return this.value
     }
 
@@ -161,7 +169,6 @@ class SuccessStatus extends SimpleElement {
 }
 
 class Location extends SimpleElement {
-    // TODO throw 403 if not initialized
 }
 
 class ObjectiveCollection {
@@ -236,6 +243,14 @@ class ProgressMeasure extends SimpleElement {
 }
 
 class ExitElement extends SimpleElement {
+    // TODO validate when initializing? allow initializing with a value?
+
+    setValue(value) {
+        const validValues = ["time-out", "suspend", "logout", "normal", ""]
+        if (!validValues.includes(value)) throw new TypeMismatchError()
+        this.value = value
+    }
+
     getValue() {
         throw new WriteOnlyError()
     }
@@ -336,10 +351,24 @@ export default class API {
         if (name === "cmi") {
             const modelElement = this.cmi.access(rest, false)
             if (modelElement) {
-                const value = modelElement.getValue()
-                this.#setErrorCode(NoError)
-                this.#emit("call", "GetValue", [element], value)
-                return value
+                try {
+                    const value = modelElement.getValue()
+                    this.#setErrorCode(NoError)
+                    this.#emit("call", "GetValue", [element], value)
+                    return value
+                } catch (error) {
+                    if (error instanceof WriteOnlyError) {
+                        this.#setErrorCode(DataModelElementIsWriteOnly)
+                        this.#emit("call", "GetValue", [element], "", true)
+                        return ""
+                    } else if (error instanceof ValueNotInitializederror) {
+                        this.#setErrorCode(DataModelElementValueNotInitialized)
+                        this.#emit("call", "GetValue", [element], "", true)
+                        return ""
+                    } else {
+                        throw error
+                    }
+                }
             } else {
                 this.#setErrorCode(UndefinedDataModelElement)
                 this.#emit("call", "GetValue", [element], "", true)
@@ -377,6 +406,10 @@ export default class API {
                 } catch (error) {
                     if (error instanceof ReadOnlyError) {
                         this.#setErrorCode(DataModelElementIsReadOnly)
+                        this.#emit("call", "SetValue", [element, value], "false", true)
+                        return "false"
+                    } else if (error instanceof TypeMismatchError) {
+                        this.#setErrorCode(DataModelElementTypeMismatch)
                         this.#emit("call", "SetValue", [element, value], "false", true)
                         return "false"
                     } else {

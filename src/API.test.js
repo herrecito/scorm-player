@@ -181,6 +181,56 @@ describe("Data Model", () => {
         })
     })
 
+    describe("Exit", () => {
+        it("fails for invalid values", () => {
+            const api = new API()
+            api.Initialize("")
+
+            const result = api.SetValue("cmi.exit", "batman")
+            assert.strictEqual(result, "false")
+
+            const errorCode = api.GetLastError()
+            assert.strictEqual(errorCode, "406")
+        })
+
+        it("is write-only", () => {
+            const api = new API()
+            api.Initialize("")
+
+            const value = api.GetValue("cmi.exit")
+            assert.strictEqual(value, "")
+
+            const errorCode = api.GetLastError()
+            assert.strictEqual(errorCode, "405")
+        })
+    })
+
+    describe("Suspend Data", () => {
+        it("reading fails if not initialized", () => {
+            const api = new API()
+            api.Initialize("")
+
+            const value = api.GetValue("cmi.suspend_data")
+            assert.strictEqual(value, "")
+
+            const errorCode = api.GetLastError()
+            assert.strictEqual(errorCode, "403")
+        })
+    })
+
+    describe("Location", () => {
+        it("reading fails if not initialized", () => {
+            const api = new API()
+            api.Initialize("")
+
+            const value = api.GetValue("cmi.location")
+            assert.strictEqual(value, "")
+
+            const errorCode = api.GetLastError()
+            assert.strictEqual(errorCode, "403")
+        })
+    })
+
     describe("Objectives", () => {
         it("TODO", () => {
             const cmi = {
