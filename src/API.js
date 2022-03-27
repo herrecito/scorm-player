@@ -18,10 +18,10 @@ const TerminationBeforeInitialization = "112"
 const TerminationAfterTermination = "113"
 const RetrieveDataBeforeInitialization = "122"
 const RetrieveDataAfterTermination = "123"
-const StoreDataBeforeTermination = "133" // TODO
-const StoreDataAfterTermination = "133" // TODO
+const StoreDataBeforeTermination = "132"
+const StoreDataAfterTermination = "133"
 const CommitBeforeInitialization = "142"
-const CommitAfterTermination = "143" // TODO
+const CommitAfterTermination = "143"
 
 const GeneralArgumentError = "201"
 
@@ -29,7 +29,7 @@ const GeneralGetFailure = "301"
 const GeneralSetFailure = "351"
 const GeneralCommitFailure = "391"
 
-const UndefinedDataModelElement = "401" // TODO
+const UndefinedDataModelElement = "401"
 const UnimplementedDataModelElement = "402"
 const DataModelElementValueNotInitialized = "403"
 const DataModelElementIsReadOnly = "404"
@@ -166,13 +166,32 @@ export default class API {
     SetValue(element, value) {
         this.emitter.emit("call", "SetValue", element, value)
 
+        if (this.state === "not-initialized") {
+            this.#setErrorCode(StoreDataBeforeTermination)
+            return "false"
+        }
+
+        if (this.state === "terminated") {
+            this.#setErrorCode(StoreDataAfterTermination)
+            return "false"
+        }
+
         switch (element) {
             case "cmi.completionStatus": {
                 this.cmi.completionStatus = value
+                return "true"
+                break
             }
 
             case "cmi.location": {
                 this.cmi.location = value
+                return "true"
+                break
+            }
+
+            default: {
+                this.#setErrorCode(UndefinedDataModelElement)
+                return "false"
             }
         }
     }

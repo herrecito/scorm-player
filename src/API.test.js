@@ -100,6 +100,37 @@ describe("API", () => {
     })
 
     describe("SetValue", () => {
+        it("fails if not initialized", () => {
+            const api = new API()
+
+            const result = api.SetValue("cmi.location", "1")
+            assert.strictEqual(result, "false")
+
+            const errorCode = api.GetLastError()
+            assert.strictEqual(errorCode, "132")
+        })
+
+        it("fails if terminated", () => {
+            const api = new API()
+            api.Initialize("")
+            api.Terminate("")
+
+            const result = api.SetValue("cmi.location", "1")
+            assert.strictEqual(result, "false")
+
+            const errorCode = api.GetLastError()
+            assert.strictEqual(errorCode, "133")
+        })
+
+        it("fails if not recognized", () => {
+            const api = new API()
+            api.Initialize("")
+
+            assert.strictEqual(api.SetValue("foo.bar", "1"), "false")
+
+            const errorCode = api.GetLastError()
+            assert.strictEqual(errorCode, "401")
+        })
     })
 
     describe("Commit", () => {
