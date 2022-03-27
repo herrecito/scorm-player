@@ -38,19 +38,221 @@ const DataModelElementTypeMismatch = "406"
 const DataModelElementValueOutOfRange = "407"
 const DataModelDependencyNotEstablished = "408"
 
+class ReadOnlyError extends Error {
+}
+
+class WriteOnlyError extends Error {
+}
+
+class CMIElement {
+    constructor(cmi) {
+        this.version = new VersionElement()
+        this.location = new Location(cmi.location)
+        this.completionStatus = new CompletionStatus(cmi.completionStatus)
+        this.objectives = new ObjectiveCollection(cmi.objectives)
+        this.progressMeasure = new ProgressMeasure(cmi.progressMeasure)
+    }
+
+    access(path, write) {
+        const [name, ...rest] = path
+        switch (name) {
+            case "_version": return this.version.access(rest, write)
+            case "location": return this.location.access(rest, write)
+            case "completion_status": return this.completionStatus.access(rest, write)
+            case "objectives": return this.objectives.access(rest, write)
+            case "progress_measure": return this.progressMeasure.access(rest, write)
+            default: return null
+        }
+    }
+}
+
+class VersionElement {
+    getValue() {
+        return "1.0"
+    }
+
+    setValue(value) {
+        throw new ReadOnlyError()
+    }
+
+    access(path) {
+        if (path.length === 0) {
+            return this
+        } else {
+            return null
+        }
+    }
+}
+
+class CompletionStatus {
+    constructor(completionStatus) {
+        this.completionStatus = completionStatus
+    }
+
+    getValue() {
+        return this.completionStatus
+    }
+
+    setValue(completionStatus) {
+        this.completionStatus = completionStatus
+    }
+
+    access(path) {
+        if (path.length === 0) {
+            return this
+        } else {
+            return null
+        }
+    }
+}
+
+class Location {
+    constructor(location="") {
+        this.location = location
+    }
+
+    getValue() {
+        return this.location
+    }
+
+    setValue(location) {
+        this.location = location
+    }
+
+    access(path) {
+        if (path.length === 0) {
+            return this
+        } else {
+            return null
+        }
+    }
+}
+
+class ObjectiveCollection {
+    constructor(objectives=[]) {
+        this.objectives = objectives.map(o => new Objective(o))
+    }
+
+    getValue() {
+        throw new Error()
+    }
+
+    setValue(value) {
+        throw new Error()
+    }
+
+    access(path, write) {
+        const [name, ...rest] = path
+        switch (name) {
+            case "_count": {
+                return new CountElement(this.objectives.length.toString())
+            }
+            default: {
+                const index = parseInt(name, 10)
+                return this.objectives[index].access(rest, write)
+            }
+        }
+    }
+}
+
+class CountElement {
+    constructor(count) {
+        this.count = count
+    }
+
+    getValue() {
+        return this.count
+    }
+
+    setValue() {
+        throw new ReadOnlyError
+    }
+
+    access(path, write) {
+        if (path.length === 0) {
+            return this
+        } else {
+            return null
+        }
+    }
+}
+
+class Objective {
+    constructor(objective) {
+        this.id = new ObjectiveId(objective.id)
+        this.progressMeasure = new ProgressMeasure(objective.progressMeasure)
+        this.completionStatus = new CompletionStatus(objective.progressMeasure)
+    }
+
+    getValue() {
+        throw new Error()
+    }
+
+    setValue(value) {
+        throw new Error()
+    }
+
+    access(path, write) {
+        const [name, ...rest] = path
+        switch (name) {
+            case "id": return this.id.access(rest, write)
+            case "progress_measure": return this.progressMeasure.access(rest, write)
+            case "completion_status": return this.completionStatus.access(rest, write)
+            default: return null
+        }
+    }
+}
+
+class ObjectiveId {
+    constructor(id) {
+        this.id = id
+    }
+
+    getValue() {
+        return this.id
+    }
+
+    setValue(id) {
+        this.id = id
+    }
+
+    access(path, write) {
+        if (path.length === 0) {
+            return this
+        } else {
+            return null
+        }
+    }
+}
+
+class ProgressMeasure {
+    constructor(progressMeasure) {
+        this.progressMeasure = this.progressMeasure
+    }
+
+    getValue() {
+        return this.progressMeasure
+    }
+
+    setValue(progressMeasure) {
+        this.progressMeasure = progressMeasure
+    }
+
+    access(path, write) {
+        if (path.length === 0) {
+            return this
+        } else {
+            return null
+        }
+    }
+}
+
 export default class API {
     constructor(cmi={}) {
-        const { objectives=[] } = cmi
 
         this.state = "not-initialized" // "not-initialized" | "running" | "terminated"
         this.errorCode = NoError
-
-        this.cmi = {
-            location: "",
-            objectives: objectives,
-            completionStatus: "unknown"
-        }
-
+        this.cmi = new CMIElement(cmi)
         this.emitter = createNanoEvents()
     }
 
@@ -122,44 +324,21 @@ export default class API {
             return ""
         }
 
-        let value = ""
-
-        const result = /cmi\.objectives\.(\d+)\.id/.exec(element)
-        if (result) {
-            let idx = result[1]
-            idx = parseInt(idx, 10)
-            value = this.cmi.objectives[idx].id
-        } else {
-            switch (element) {
-                case "cmi._version": {
-                    value = "1.0"
-                    break
-                }
-
-                case "cmi.completion_status": {
-                    value = this.cmi.completionStatus
-                    break
-                }
-
-                case "cmi.objectives._count": {
-                    value = this.cmi.objectives.length.toString()
-                    break
-                }
-
-                case "cmi.location": {
-                    value = this.cmi.location
-                    break
-                }
-
-                default: {
-                    this.#setErrorCode(UndefinedDataModelElement)
-                    return ""
-                }
+        const [name, ...rest] = element.split(".")
+        if (name === "cmi") {
+            const element = this.cmi.access(rest, false)
+            if (element) {
+                const value = element.getValue()
+                this.#setErrorCode(NoError)
+                return value
+            } else {
+                this.#setErrorCode(UndefinedDataModelElement)
+                return ""
             }
+        } else {
+            this.#setErrorCode(UndefinedDataModelElement)
+            return ""
         }
-
-        this.#setErrorCode(NoError)
-        return value
     }
 
     // string
@@ -176,23 +355,29 @@ export default class API {
             return "false"
         }
 
-        switch (element) {
-            case "cmi.completion_status": {
-                this.cmi.completionStatus = value
-                return "true"
-                break
-            }
-
-            case "cmi.location": {
-                this.cmi.location = value
-                return "true"
-                break
-            }
-
-            default: {
+        const [name, ...rest] = element.split(".")
+        if (name === "cmi") {
+            const element = this.cmi.access(rest, false)
+            if (element) {
+                try {
+                    element.setValue(value)
+                    this.#setErrorCode(NoError)
+                    return "true"
+                } catch (error) {
+                    if (error instanceof ReadOnlyError) {
+                        this.#setErrorCode(DataModelElementIsReadOnly)
+                        return "false"
+                    } else {
+                        throw error
+                    }
+                }
+            } else {
                 this.#setErrorCode(UndefinedDataModelElement)
                 return "false"
             }
+        } else {
+            this.#setErrorCode(UndefinedDataModelElement)
+            return "false"
         }
     }
 

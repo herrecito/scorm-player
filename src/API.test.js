@@ -166,11 +166,19 @@ describe("Data Model", () => {
             api.Initialize("")
 
             const value = api.GetValue("cmi._version")
-
             assert.strictEqual(value, "1.0")
         })
 
-        it("is read-only")
+        it("is read-only", () => {
+            const api = new API()
+            api.Initialize("")
+
+            const value = api.SetValue("cmi._version", "1.1")
+            assert.strictEqual(value, "false")
+
+            const errorCode = api.GetLastError()
+            assert.strictEqual(errorCode, "404")
+        })
     })
 
     describe("Objectives", () => {
