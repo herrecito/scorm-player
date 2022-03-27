@@ -2,7 +2,7 @@
     <div class="h-screen flex">
         <div class="flex flex-col">
             <form
-                class="mb-4 p-4 flex"
+                class="p-4 flex"
                 @submit.prevent="onSubmit"
             >
                 <input
@@ -14,11 +14,21 @@
                     Upload
                 </button>
             </form>
+            <div>
+                <div
+                    v-for="entry in log"
+                    :key="entry.key"
+                    class="text-xs font-mono px-1 truncate"
+                    :class="entry.klass"
+                    :title="entry.message"
+                >
+                    {{ entry.message }}
+                </div>
+            </div>
         </div>
 
         <iframe
             v-if="iframeSrc"
-            :key="iframeKey"
             class="grow"
             :src="iframeSrc"
         />
@@ -26,6 +36,7 @@
 </template>
 
 <script>
+import uniqueId from "lodash/uniqueId"
 import * as zip from "@zip.js/zip.js"
 
 import API from "./API.js"
@@ -42,11 +53,12 @@ function manifest2cmi(manifest) {
 
     const oids = []
     const imsssObjectives = item.querySelector("objectives")
-
-    const objectives = imsssObjectives.querySelectorAll("objective")
-    for (const objective of objectives) {
-        const oid = objective.getAttribute("objectiveID")
-        oids.push(oid)
+    if (imsssObjectives) {
+        const objectives = imsssObjectives.querySelectorAll("objective")
+        for (const objective of objectives) {
+            const oid = objective.getAttribute("objectiveID")
+            oids.push(oid)
+        }
     }
 
     return {
@@ -81,10 +93,21 @@ async function sha256(uint8Array) {
     return hashArray.map(b => b.toString(16).padStart(2, "0")).join("")
 }
 
+function entryKlass(fn) {
+    switch (fn) {
+        case "Initialize": return "text-green-700"
+        case "Terminate": return "text-purple-700"
+        case "GetLastError": return "text-red-700"
+        case "Commit": return "font-bold"
+        default: return "text-gray-700"
+    }
+}
+
 export default {
     data() {
         return {
-            iframeSrc: ""
+            iframeSrc: "",
+            log: []
         }
     },
 
@@ -128,7 +151,11 @@ export default {
             const api = new API(cmi)
 
             api.on("call", (fn, ...args) => {
-                console.log(fn, ...args)
+                this.log.unshift({
+                    key: uniqueId(),
+                    message: `${fn} ${args.map(arg => arg.toString()).join(" ")}`,
+                    klass: entryKlass(fn)
+                })
 
                 if (fn === "Terminate") {
                     setTimeout(() => {
