@@ -1,5 +1,6 @@
 import * as zip from "@zip.js/zip.js"
-import API from "./API"
+
+import API from "./API.js"
 
 const input = document.createElement("input")
 input.type = "file"
@@ -43,6 +44,7 @@ input.addEventListener("change", async event => {
             oids.push(oid)
         }
     }
+    console.log("oids", oids)
 
     const resourceId = item.getAttribute("identifierref")
 
@@ -67,7 +69,7 @@ input.addEventListener("change", async event => {
         }
 
         window.API_1484_11 = new API({
-            objectives: oids.map(id => { id })
+            objectives: oids.map(id => ({ id }))
         })
 
         const iframe = document.createElement("iframe")

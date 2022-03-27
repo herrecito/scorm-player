@@ -1,7 +1,11 @@
-const path = require("path")
-const HtmlWebpackPlugin = require("html-webpack-plugin")
+import { dirname, resolve } from "path"
+import { fileURLToPath } from "url";
 
-module.exports = {
+import HtmlWebpackPlugin from "html-webpack-plugin"
+
+const __dirname = dirname(fileURLToPath(import.meta.url))
+
+export default {
     mode: "development",
 
     entry: {
@@ -11,7 +15,7 @@ module.exports = {
 
     output: {
         filename: "[name].js",
-        path: path.resolve(__dirname, "dist"),
+        path: resolve(__dirname, "dist"),
     },
 
     plugins: [new HtmlWebpackPlugin({
