@@ -1,5 +1,8 @@
 import { dirname, resolve } from "path"
-import { fileURLToPath } from "url";
+import { fileURLToPath } from "url"
+
+import { VueLoaderPlugin } from "vue-loader"
+
 
 import HtmlWebpackPlugin from "html-webpack-plugin"
 
@@ -18,7 +21,20 @@ export default {
         path: resolve(__dirname, "dist"),
     },
 
-    plugins: [new HtmlWebpackPlugin({
-        chunks: ["main"]
-    })],
+    module: {
+        rules: [
+            {
+                test: /\.vue$/,
+                loader: "vue-loader"
+            }
+        ]
+    },
+
+    plugins: [
+        new HtmlWebpackPlugin({
+            template: "./src/index.html",
+            chunks: ["main"]
+        }),
+        new VueLoaderPlugin()
+    ],
 }
