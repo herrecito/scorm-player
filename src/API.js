@@ -48,17 +48,46 @@ class CMIElement {
         this.completionStatus = new CompletionStatus(cmi.completionStatus)
         this.objectives = new ObjectiveCollection(cmi.objectives)
         this.progressMeasure = new ProgressMeasure(cmi.progressMeasure)
+        this.sessionTime = new SessionTime(cmi.sessionTime)
+        this.exit = new ExitElement()
     }
 
     access(path, write) {
         const [name, ...rest] = path
         switch (name) {
-            case "_version": return this.version.access(rest, write)
-            case "location": return this.location.access(rest, write)
-            case "completion_status": return this.completionStatus.access(rest, write)
-            case "objectives": return this.objectives.access(rest, write)
-            case "progress_measure": return this.progressMeasure.access(rest, write)
-            default: return null
+            case "_version":
+                return this.version.access(rest, write)
+
+            case "location":
+                return this.location.access(rest, write)
+
+            case "completion_status":
+                return this.completionStatus.access(rest, write)
+
+            case "objectives":
+                return this.objectives.access(rest, write)
+
+            case "progress_measure":
+                return this.progressMeasure.access(rest, write)
+
+            case "exit":
+                return this.exit.access(rest, write)
+
+            case "session_time":
+                return this.sessionTime.access(rest, write)
+
+            default:
+                return null
+        }
+    }
+
+    export() {
+        return {
+            location: this.location.export(),
+            completionStatus: this.completionStatus.export(),
+            objectives: this.objectives.export(),
+            progressMeasure: this.progressMeasure.export(),
+            exit: this.exit.export()
         }
     }
 }
@@ -78,6 +107,10 @@ class VersionElement {
         } else {
             return null
         }
+    }
+
+    export() {
+        throw new Error()
     }
 }
 
@@ -101,6 +134,10 @@ class CompletionStatus {
             return null
         }
     }
+
+    export() {
+        return this.completionStatus
+    }
 }
 
 class Location {
@@ -122,6 +159,10 @@ class Location {
         } else {
             return null
         }
+    }
+
+    export() {
+        return this.location
     }
 }
 
@@ -150,6 +191,10 @@ class ObjectiveCollection {
             }
         }
     }
+
+    export() {
+        return this.objectives.map(o => o.export())
+    }
 }
 
 class CountElement {
@@ -171,6 +216,10 @@ class CountElement {
         } else {
             return null
         }
+    }
+
+    export() {
+        throw new Error()
     }
 }
 
@@ -198,6 +247,14 @@ class Objective {
             default: return null
         }
     }
+
+    export() {
+        return {
+            id: this.id.export(),
+            progressMeasure: this.progressMeasure.export(),
+            completionStatus: this.completionStatus.export()
+        }
+    }
 }
 
 class ObjectiveId {
@@ -219,6 +276,10 @@ class ObjectiveId {
         } else {
             return null
         }
+    }
+
+    export() {
+        return this.id
     }
 }
 
@@ -242,11 +303,66 @@ class ProgressMeasure {
             return null
         }
     }
+
+    export() {
+        return this.progressMeasure
+    }
+}
+
+class ExitElement {
+    constructor(exit="") {
+        this.exit = exit
+    }
+
+    getValue() {
+        throw new WriteOnlyError()
+    }
+
+    setValue(exit) {
+        this.exit = exit
+    }
+
+    access(path, write) {
+        if (path.length === 0) {
+            return this
+        } else {
+            return null
+        }
+    }
+
+    export() {
+        return this.exit
+    }
+}
+
+class SessionTime {
+    constructor(sessionTime) {
+        this.sessionTime = sessionTime
+    }
+
+    getValue() {
+        return this.sessionTime
+    }
+
+    setValue(sessionTime) {
+        this.sessionTime = sessionTime
+    }
+
+    access(path, write) {
+        if (path.length === 0) {
+            return this
+        } else {
+            return null
+        }
+    }
+
+    export() {
+        return this.sessionTime
+    }
 }
 
 export default class API {
     constructor(cmi={}) {
-
         this.state = "not-initialized" // "not-initialized" | "running" | "terminated"
         this.errorCode = NoError
         this.cmi = new CMIElement(cmi)
@@ -302,6 +418,8 @@ export default class API {
             this.#setErrorCode(TerminationAfterTermination)
             return "false"
         }
+
+        this.emitter.emit("persist", this.cmi.export())
 
         this.state = "terminated"
         this.#setErrorCode(NoError)
@@ -396,7 +514,10 @@ export default class API {
             return "false"
         }
 
-        return "true" // TODO
+        this.emitter.emit("persist", this.cmi.export())
+
+        this.#setErrorCode(NoError)
+        return "true"
     }
 
     GetLastError() {

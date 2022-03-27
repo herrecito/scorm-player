@@ -1,14 +1,16 @@
 <template>
-    <div>
-        <input
-            type="file"
-            @change="onChange"
-        />
+    <div class="h-screen flex flex-col">
+        <div class="mb-4 p-4">
+            <input
+                type="file"
+                @change="onChange"
+            />
+        </div>
 
         <iframe
             v-if="iframeSrc"
+            class="grow"
             :src="iframeSrc"
-            :style="iframeStyle"
         />
     </div>
 </template>
@@ -22,16 +24,6 @@ export default {
     data() {
         return {
             iframeSrc: "",
-        }
-    },
-
-    computed: {
-        iframeStyle() {
-            return {
-                display: "block",
-                width: "100%",
-                minHeight: "800px"
-            }
         }
     },
 
@@ -98,9 +90,12 @@ export default {
                     })
                 }
 
-                const api = new API({
+                const state = window.localStorage.getItem("state")
+                const cmi = state ? JSON.parse(state) : {
                     objectives: oids.map(id => ({ id }))
-                })
+                }
+
+                const api = new API(cmi)
 
                 api.on("call", (...args) => {
                     console.log(...args)
@@ -110,6 +105,12 @@ export default {
                     if (errorCode === "0") return
 
                     console.log("error-code", errorCode, api.GetErrorString(errorCode))
+                })
+
+                api.on("persist", cmi => {
+                    console.log("persist", cmi)
+
+                    window.localStorage.setItem("state", JSON.stringify(cmi))
                 })
 
                 window.API_1484_11 = api
