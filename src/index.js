@@ -68,9 +68,15 @@ input.addEventListener("change", async event => {
             })
         }
 
-        window.API_1484_11 = new API({
+        const api = new API({
             objectives: oids.map(id => ({ id }))
         })
+
+        api.on("call", (...args) => {
+            console.log(...args)
+        })
+
+        window.API_1484_11 = api
 
         const iframe = document.createElement("iframe")
         iframe.src = href

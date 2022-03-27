@@ -86,6 +86,45 @@ describe("API", () => {
             const errorCode = api.GetLastError()
             assert.strictEqual(errorCode, "123")
         })
+
+        it("fails if not recognized", () => {
+            const api = new API()
+            api.Initialize("")
+
+            const value = api.GetValue("foo.bar")
+            assert.strictEqual(value, "")
+
+            const errorCode = api.GetLastError()
+            assert.strictEqual(errorCode, "401")
+        })
+    })
+
+    describe("SetValue", () => {
+    })
+
+    describe("Commit", () => {
+        it("fails if not initialized", () => {
+            const api = new API()
+
+            assert.strictEqual(api.Commit(""), "false")
+            assert.strictEqual(api.GetLastError(), "142")
+        })
+
+        it("fails if terminated", () => {
+            const api = new API()
+            api.Initialize("")
+            api.Terminate("")
+
+            assert.strictEqual(api.Commit(""), "false")
+            assert.strictEqual(api.GetLastError(), "143")
+        })
+
+        it("fails if no empty string is passed", () => {
+            const api = new API()
+            api.Initialize("")
+            assert.strictEqual(api.Commit(), "false")
+            assert.strictEqual(api.GetLastError(), "201")
+        })
     })
 })
 

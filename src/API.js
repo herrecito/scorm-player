@@ -5,6 +5,8 @@
 // Data Model Errors    400 - 499
 // Implentation-defined 1000 - 65535
 
+import { createNanoEvents } from "nanoevents"
+
 const NoError = "0"
 
 const GeneralException = "101"
@@ -18,7 +20,7 @@ const RetrieveDataBeforeInitialization = "122"
 const RetrieveDataAfterTermination = "123"
 const StoreDataBeforeTermination = "133" // TODO
 const StoreDataAfterTermination = "133" // TODO
-const CommitBeforeInitialization = "142" // TODO
+const CommitBeforeInitialization = "142"
 const CommitAfterTermination = "143" // TODO
 
 const GeneralArgumentError = "201"
@@ -36,7 +38,6 @@ const DataModelElementTypeMismatch = "406"
 const DataModelElementValueOutOfRange = "407"
 const DataModelDependencyNotEstablished = "408"
 
-
 export default class API {
     constructor(cmi={}) {
         const { objectives=[] } = cmi
@@ -49,10 +50,16 @@ export default class API {
             objectives: objectives,
             completionStatus: "unknown"
         }
+
+        this.emitter = createNanoEvents()
+    }
+
+    on(event, callback) {
+        return this.emitter.on(event, callback)
     }
 
     Initialize(param) {
-        console.log("Initialize")
+        this.emitter.emit("call", "Initialize", param)
 
         if (param !== "") {
             this.errorCode = GeneralArgumentError
@@ -75,7 +82,7 @@ export default class API {
     }
 
     Terminate(param) {
-        console.log("Terminate")
+        this.emitter.emit("call", "Terminate", param)
 
         if (param !== "") {
             this.errorCode = GeneralArgumentError
@@ -98,6 +105,8 @@ export default class API {
     }
 
     GetValue(element) {
+        this.emitter.emit("call", "GetValue", element)
+
         if (this.state === "not-initialized") {
             this.errorCode = RetrieveDataBeforeInitialization
             return ""
@@ -137,19 +146,20 @@ export default class API {
                     break
                 }
 
-                default:
-                    // NOP
+                default: {
+                    this.errorCode = UndefinedDataModelElement
+                    return ""
+                }
             }
         }
 
-        console.log("GetValue", element, value)
         this.erroCode = NoError
         return value
     }
 
     // string
     SetValue(element, value) {
-        console.log("SetValue", element, value)
+        this.emitter.emit("call", "SetValue", element, value)
 
         switch (element) {
             case "cmi.completionStatus": {
@@ -162,23 +172,42 @@ export default class API {
         }
     }
 
-    // bool
-    Commit() {
-        console.log("Commit")
+    Commit(param) {
+        this.emitter.emit("call", "Commit", param)
+
+        if (param !== "") {
+            this.errorCode = GeneralArgumentError
+            return "false"
+        }
+
+        if (this.state === "not-initialized") {
+            this.errorCode = CommitBeforeInitialization
+            return "false"
+        }
+
+        if (this.state === "terminated") {
+            this.errorCode = CommitAfterTermination
+            return "false"
+        }
+
+        return "true" // TODO
     }
 
     GetLastError() {
-        console.log("GetLastError", this.errorCode)
+        this.emitter.emit("call", "GetLastError")
+
         return this.errorCode
     }
 
     GetErrorString(errorCode) {
-        console.log("GetErrorString", errorCode)
+        this.emitter.emit("call", "GetErrorString", errorCode)
+
         return "" // TODO
     }
 
     GetDiagnostic(errorCode) {
-        console.log("GetDiagnostic", errorCode)
+        this.emitter.emit("call", "GetDiagnostic", errorCode)
+
         return "" // TODO
     }
 }
