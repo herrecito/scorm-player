@@ -76,6 +76,12 @@ input.addEventListener("change", async event => {
             console.log(...args)
         })
 
+        api.on("error-code", (errorCode) => {
+            if (errorCode === "0") return
+
+            console.log("error-code", errorCode)
+        })
+
         window.API_1484_11 = api
 
         const iframe = document.createElement("iframe")

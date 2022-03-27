@@ -58,26 +58,31 @@ export default class API {
         return this.emitter.on(event, callback)
     }
 
+    #setErrorCode(errorCode) {
+        this.emitter.emit("error-code", errorCode)
+        this.errorCode = errorCode
+    }
+
     Initialize(param) {
         this.emitter.emit("call", "Initialize", param)
 
         if (param !== "") {
-            this.errorCode = GeneralArgumentError
+            this.#setErrorCode(GeneralArgumentError)
             return "false"
         }
 
         if (this.state === "running") {
-            this.errorCode = AlreadyInitialized
+            this.#setErrorCode(AlreadyInitialized)
             return "false"
         }
 
         if (this.state === "terminated") {
-            this.errorCode = ContentInstanceTerminated
+            this.#setErrorCode(ContentInstanceTerminated)
             return "false"
         }
 
         this.state = "running"
-        this.errorCode = NoError
+        this.#setErrorCode(NoError)
         return "true"
     }
 
@@ -85,22 +90,22 @@ export default class API {
         this.emitter.emit("call", "Terminate", param)
 
         if (param !== "") {
-            this.errorCode = GeneralArgumentError
+            this.#setErrorCode(GeneralArgumentError)
             return "false"
         }
 
         if (this.state === "not-initialized") {
-            this.errorCode = TerminationBeforeInitialization
+            this.#setErrorCode(TerminationBeforeInitialization)
             return "false"
         }
 
         if (this.state === "terminated") {
-            this.errorCode = TerminationAfterTermination
+            this.#setErrorCode(TerminationAfterTermination)
             return "false"
         }
 
         this.state = "terminated"
-        this.errorCode = NoError
+        this.#setErrorCode(NoError)
         return "true"
     }
 
@@ -108,12 +113,12 @@ export default class API {
         this.emitter.emit("call", "GetValue", element)
 
         if (this.state === "not-initialized") {
-            this.errorCode = RetrieveDataBeforeInitialization
+            this.#setErrorCode(RetrieveDataBeforeInitialization)
             return ""
         }
 
         if (this.state === "terminated") {
-            this.errorCode = RetrieveDataAfterTermination
+            this.#setErrorCode(RetrieveDataAfterTermination)
             return ""
         }
 
@@ -147,13 +152,13 @@ export default class API {
                 }
 
                 default: {
-                    this.errorCode = UndefinedDataModelElement
+                    this.#setErrorCode(UndefinedDataModelElement)
                     return ""
                 }
             }
         }
 
-        this.erroCode = NoError
+        this.#setErrorCode(NoError)
         return value
     }
 
@@ -176,17 +181,17 @@ export default class API {
         this.emitter.emit("call", "Commit", param)
 
         if (param !== "") {
-            this.errorCode = GeneralArgumentError
+            this.#setErrorCode(GeneralArgumentError)
             return "false"
         }
 
         if (this.state === "not-initialized") {
-            this.errorCode = CommitBeforeInitialization
+            this.#setErrorCode(CommitBeforeInitialization)
             return "false"
         }
 
         if (this.state === "terminated") {
-            this.errorCode = CommitAfterTermination
+            this.#setErrorCode(CommitAfterTermination)
             return "false"
         }
 
