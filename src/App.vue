@@ -18,12 +18,12 @@
                 <div
                     v-for="entry in log"
                     :key="entry.key"
-                    class="text-xs font-mono px-1 truncate"
+                    class="text-xs font-mono px-1 truncate transition-colors duration-1000 ease-out hover:bg-gray-200"
                     :class="entryKlass(entry)"
                 >
                     {{ entry.functionName }}
                     {{ entry.args.map(a => a.toString()).join(" ") }}
-                    <div class="pl-2">
+                    <div class="pl-2 truncate">
                         {{ entry.returnValue !== "" ? entry.returnValue : "&nbsp;" }}
                     </div>
                 </div>
@@ -32,6 +32,7 @@
 
         <iframe
             v-if="iframeSrc"
+            :key="iframeKey"
             class="grow"
             :src="iframeSrc"
         />
@@ -100,14 +101,27 @@ export default {
     data() {
         return {
             iframeSrc: "",
-            log: []
+            iframeKey: uniqueId(),
+            log: [],
+            now: Date.now(),
         }
+    },
+
+    mounted() {
+        this.interval = window.setInterval(() => {
+            this.now = Date.now()
+        }, 1000)
+    },
+
+    unmounted() {
+        window.clearInterval(this.interval)
     },
 
     methods: {
         entryKlass(entry) {
-            if (entry.isError) {
-                return "font-bold text-red-700"
+            const soon = (this.now - entry.timestamp) < 3000
+            if (soon) {
+                return "text-blue-700"
             } else {
                 return "text-gray-700"
             }
@@ -170,32 +184,26 @@ export default {
             api.on("call", (fn, args, returnValue, isError) => {
                 this.log.unshift({
                     key: uniqueId(),
+                    timestamp: Date.now(),
                     functionName: fn,
                     args,
                     returnValue,
                     isError
                 })
-
-                if (fn === "Terminate") {
-                    setTimeout(() => {
-                        this.iframeSrc = null
-                    })
-                }
-            })
-
-            api.on("error-code", (errorCode) => {
-                if (errorCode === "0") return
-
-                console.log("error-code", errorCode, api.GetErrorString(errorCode))
             })
 
             api.on("persist", cmi => {
                 window.localStorage.setItem(`${file.name}-state`, JSON.stringify(cmi))
             })
 
-            window.API_1484_11 = api
+            // Unmount previous iframe and wait for it to do its things
+            this.iframeSrc = ""
+            this.iframeKey = uniqueId()
+            await this.$nextTick()
 
+            window.API_1484_11 = api
             this.iframeSrc = href
+            this.iframeKey = uniqueId()
             this.log = []
 
             await reader.close()
