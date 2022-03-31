@@ -15,18 +15,20 @@
                 </button>
             </form>
             <div class="overflow-x-auto">
-                <div
-                    v-for="entry in log"
-                    :key="entry.key"
-                    class="text-xs font-mono px-1 truncate transition-colors duration-1000 ease-out hover:bg-gray-200"
-                    :class="entryKlass(entry)"
-                >
-                    {{ entry.functionName }}
-                    {{ entry.args.map(a => a.toString()).join(" ") }}
-                    <div class="pl-2 truncate">
-                        {{ entry.returnValue !== "" ? entry.returnValue : "&nbsp;" }}
-                    </div>
-                </div>
+                <template v-for="event in eventLog">
+                    <api-call-event
+                        v-if="event.type === 'api-call'"
+                        :key="event.key"
+                        :event="event"
+                        :recent="now - event.timestamp < 3000"
+                    />
+
+                    <scorm-load-event
+                        v-else-if="event.type === 'scorm-load'"
+                        :key="event.key"
+                        :event="event"
+                    />
+                </template>
             </div>
         </div>
 
@@ -42,6 +44,9 @@
 <script>
 import uniqueId from "lodash/uniqueId"
 import * as zip from "@zip.js/zip.js"
+
+import ApiCallEvent from "./ApiCallEvent.vue"
+import ScormLoadEvent from "./ScormLoadEvent.vue"
 
 import API from "./API.js"
 
@@ -102,7 +107,7 @@ export default {
         return {
             iframeSrc: "",
             iframeKey: uniqueId(),
-            log: [],
+            eventLog: [],
             now: Date.now(),
         }
     },
@@ -118,15 +123,6 @@ export default {
     },
 
     methods: {
-        entryKlass(entry) {
-            const soon = (this.now - entry.timestamp) < 3000
-            if (soon) {
-                return "text-blue-700"
-            } else {
-                return "text-gray-700"
-            }
-        },
-
         async onSubmit() {
             const file = this.$refs.inputFile.files[0]
             if (!file) return
@@ -181,14 +177,15 @@ export default {
 
             const api = new API(cmi)
 
-            api.on("call", (fn, args, returnValue, isError) => {
-                this.log.unshift({
+            api.on("call", (fn, args, returnValue) => {
+                this.eventLog.unshift({
                     key: uniqueId(),
                     timestamp: Date.now(),
+                    type: "api-call",
+
                     functionName: fn,
                     args,
                     returnValue,
-                    isError
                 })
             })
 
@@ -204,10 +201,21 @@ export default {
             window.API_1484_11 = api
             this.iframeSrc = href
             this.iframeKey = uniqueId()
-            this.log = []
+            this.eventLog.unshift({
+                key: uniqueId(),
+                timestamp: Date.now(),
+                type: "scorm-load",
+
+                name: file.name,
+            })
 
             await reader.close()
         }
+    },
+
+    components: {
+        ApiCallEvent,
+        ScormLoadEvent,
     }
 }
 </script>
