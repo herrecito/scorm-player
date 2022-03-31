@@ -28,6 +28,11 @@
                         :key="event.key"
                         :event="event"
                     />
+
+                    <persist-event
+                        v-else-if="event.type === 'persist'"
+                        :key="event.key"
+                    />
                 </template>
             </div>
         </div>
@@ -47,6 +52,7 @@ import * as zip from "@zip.js/zip.js"
 
 import ApiCallEvent from "./ApiCallEvent.vue"
 import ScormLoadEvent from "./ScormLoadEvent.vue"
+import PersistEvent from "./PersistEvent.vue"
 
 import API from "./API.js"
 
@@ -127,6 +133,13 @@ export default {
             const file = this.$refs.inputFile.files[0]
             if (!file) return
 
+            {
+                // Unmount previous iframe and wait for it to do its things
+                this.iframeSrc = ""
+                this.iframeKey = uniqueId()
+                await this.$nextTick()
+            }
+
             const data = await file.arrayBuffer()
 
             const reader = new zip.ZipReader(new zip.BlobReader(file))
@@ -172,8 +185,9 @@ export default {
                 })
             }))
 
-            const state = window.localStorage.getItem(`${file.name}-state`)
-            const cmi = state ? JSON.parse(state) : manifest2cmi(imsManifest)
+            const item = window.localStorage.getItem(`${file.name}-history`)
+            const history = item ? JSON.parse(item) : []
+            const cmi = history.length > 0 ? history.at(-1).cmi : manifest2cmi(imsManifest)
 
             const api = new API(cmi)
 
@@ -190,13 +204,21 @@ export default {
             })
 
             api.on("persist", cmi => {
-                window.localStorage.setItem(`${file.name}-state`, JSON.stringify(cmi))
-            })
+                const item = window.localStorage.getItem(`${file.name}-history`)
+                const history = item ? JSON.parse(item) : []
+                // TODO delete entries if history gets too long
+                history.push({
+                    timestamp: Date.now(),
+                    cmi
+                })
+                window.localStorage.setItem(`${file.name}-history`, JSON.stringify(history))
 
-            // Unmount previous iframe and wait for it to do its things
-            this.iframeSrc = ""
-            this.iframeKey = uniqueId()
-            await this.$nextTick()
+                this.eventLog.unshift({
+                    key: uniqueId(),
+                    timestamp: Date.now(),
+                    type: "persist",
+                })
+            })
 
             window.API_1484_11 = api
             this.iframeSrc = href
@@ -216,6 +238,7 @@ export default {
     components: {
         ApiCallEvent,
         ScormLoadEvent,
+        PersistEvent,
     }
 }
 </script>
