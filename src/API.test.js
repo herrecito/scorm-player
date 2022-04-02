@@ -181,6 +181,52 @@ describe("Data Model", () => {
         })
     })
 
+    describe("Comments From Learner", () => {
+        it("returns the implemented _children", () => {
+            const api = new API()
+            api.Initialize("")
+
+            const value = api.GetValue("cmi.comments_from_learner._children")
+            assert.strictEqual(value, "comment,location")
+        })
+
+        it("allows creating new records by writing to comment", () => {
+            const api = new API()
+            api.Initialize("")
+
+            const result = api.SetValue("cmi.comments_from_learner.0.comment", "text")
+            assert.strictEqual(result, "true")
+
+            const value = api.GetValue("cmi.comments_from_learner.0.comment")
+            assert.strictEqual(value, "text")
+        })
+
+        it("fails when reading uninitialized values", () => {
+            const api = new API()
+            api.Initialize("")
+
+            const result = api.SetValue("cmi.comments_from_learner.0.comment", "text")
+            assert.strictEqual(result, "true")
+
+            const value = api.GetValue("cmi.comments_from_learner.0.location")
+            assert.strictEqual(value, "")
+
+            const errorCode = api.GetLastError()
+            assert.strictEqual(errorCode, "403")
+        })
+
+        it("fails when setting out of range values", () => {
+            const api = new API()
+            api.Initialize("")
+
+            const result = api.SetValue("cmi.comments_from_learner.1.comment", "text")
+            assert.strictEqual(result, "false")
+
+            const errorCode = api.GetLastError()
+            assert.strictEqual(errorCode, "351")
+        })
+    })
+
     describe("Exit", () => {
         it("fails for invalid values", () => {
             const api = new API()
@@ -246,5 +292,7 @@ describe("Data Model", () => {
             assert.strictEqual(api.GetValue("cmi.objectives._count"), "3")
             assert.strictEqual(api.GetValue("cmi.objectives.1.id"), "obj2")
         })
+
+        it("only allow creating a new objective by setting the id")
     })
 })

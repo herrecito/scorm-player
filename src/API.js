@@ -47,6 +47,9 @@ class TypeMismatchError extends Error {
 class ValueNotInitializederror extends Error {
 }
 
+class OutOfBoundError extends Error {
+}
+
 class SimpleElement {
     constructor(value) {
         this.value = value
@@ -81,12 +84,59 @@ class ROSimpleElement extends SimpleElement {
     }
 }
 
+function createCollectionClass(Element) {
+    return class Collection {
+        constructor(items=[]) {
+            this.items = items.map(item => new Element(item))
+        }
+
+        getValue() {
+            throw new Error()
+        }
+
+        setValue() {
+            throw new Error()
+        }
+
+        access(path, write) {
+            const [name, ...rest] = path
+            switch (name) {
+                case "_count": {
+                    return new ROSimpleElement(this.items.length.toString()).access(rest, write)
+                }
+
+                case "_children": {
+                    return new ROSimpleElement(Element.children.join(",")).access(rest, write)
+                }
+
+                default: {
+                    const index = parseInt(name, 10)
+                    if (index in this.items) {
+                        return this.items[index].access(rest, write)
+                    } else if (index >= 0 && index <= this.items.length) {
+                        const element = new Element()
+                        this.items[index] = element
+                        return element.access(rest, write)
+                    } else {
+                        throw new OutOfBoundError()
+                    }
+                }
+            }
+        }
+
+        export() {
+            return this.items.map(o => o.export())
+        }
+    }
+}
+
 class CMIElement {
     constructor(cmi) {
         this.location = new Location(cmi.location)
         this.completionStatus = new CompletionStatus(cmi.completionStatus)
         this.successStatus = new SuccessStatus(cmi.successStatus)
-        this.objectives = new ObjectiveCollection(cmi.objectives)
+        this.objectives = new (createCollectionClass(Objective))(cmi.objectives)
+        this.commentsFromLearner = new (createCollectionClass(CommentFromLearner))(cmi.commentsFromLearner)
         this.progressMeasure = new ProgressMeasure(cmi.progressMeasure)
         this.sessionTime = new SessionTime(cmi.sessionTime)
         this.suspendData = new SuspendData(cmi.suspendData)
@@ -111,6 +161,9 @@ class CMIElement {
 
             case "success_status":
                 return this.successStatus.access(rest, write)
+
+            case "comments_from_learner":
+                return this.commentsFromLearner.access(rest, write)
 
             case "objectives":
                 return this.objectives.access(rest, write)
@@ -171,9 +224,15 @@ class SuccessStatus extends SimpleElement {
 class Location extends SimpleElement {
 }
 
-class ObjectiveCollection {
-    constructor(objectives=[]) {
-        this.objectives = objectives.map(o => new Objective(o))
+class Comment extends SimpleElement {
+}
+
+class CommentFromLearner {
+    static children = ["comment", "location"]
+
+    constructor(commentFromLearner) {
+        this.comment = new Comment(commentFromLearner?.comment)
+        this.location = new Location(commentFromLearner?.location)
     }
 
     getValue() {
@@ -187,18 +246,10 @@ class ObjectiveCollection {
     access(path, write) {
         const [name, ...rest] = path
         switch (name) {
-            case "_count": {
-                return new ROSimpleElement(this.objectives.length.toString()).access(rest, write)
-            }
-            default: {
-                const index = parseInt(name, 10)
-                return this.objectives[index].access(rest, write)
-            }
+            case "comment": return this.comment.access(rest, write)
+            case "location": return this.location.access(rest, write)
+            default: return null
         }
-    }
-
-    export() {
-        return this.objectives.map(o => o.export())
     }
 }
 
@@ -396,30 +447,40 @@ export default class API {
 
         const [name, ...rest] = element.split(".")
         if (name === "cmi") {
-            const modelElement = this.cmi.access(rest, false)
-            if (modelElement) {
-                try {
-                    modelElement.setValue(value)
-                    this.#setErrorCode(NoError)
-                    this.#emit("call", "SetValue", [element, value], "true")
-                    return "true"
-                } catch (error) {
-                    if (error instanceof ReadOnlyError) {
-                        this.#setErrorCode(DataModelElementIsReadOnly)
-                        this.#emit("call", "SetValue", [element, value], "false", true)
-                        return "false"
-                    } else if (error instanceof TypeMismatchError) {
-                        this.#setErrorCode(DataModelElementTypeMismatch)
-                        this.#emit("call", "SetValue", [element, value], "false", true)
-                        return "false"
-                    } else {
-                        throw error
+            try {
+                const modelElement = this.cmi.access(rest, false)
+                if (modelElement) {
+                    try {
+                        modelElement.setValue(value)
+                        this.#setErrorCode(NoError)
+                        this.#emit("call", "SetValue", [element, value], "true")
+                        return "true"
+                    } catch (error) {
+                        if (error instanceof ReadOnlyError) {
+                            this.#setErrorCode(DataModelElementIsReadOnly)
+                            this.#emit("call", "SetValue", [element, value], "false", true)
+                            return "false"
+                        } else if (error instanceof TypeMismatchError) {
+                            this.#setErrorCode(DataModelElementTypeMismatch)
+                            this.#emit("call", "SetValue", [element, value], "false", true)
+                            return "false"
+                        } else {
+                            throw error
+                        }
                     }
+                } else {
+                    this.#setErrorCode(UndefinedDataModelElement)
+                    this.#emit("call", "SetValue", [element, value], "false", true)
+                    return "false"
                 }
-            } else {
-                this.#setErrorCode(UndefinedDataModelElement)
-                this.#emit("call", "SetValue", [element, value], "false", true)
-                return "false"
+            } catch (error) {
+                if (error instanceof OutOfBoundError) {
+                    this.#setErrorCode(GeneralSetFailure)
+                    this.#emit("call", "SetValue", [element, value], "false", true)
+                    return "false"
+                } else {
+                    throw error
+                }
             }
         } else {
             this.#setErrorCode(UndefinedDataModelElement)
