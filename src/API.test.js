@@ -287,13 +287,45 @@ describe("Data Model", () => {
             assert.strictEqual(errorCode, "406")
         })
 
-        //If a cmi.completion_threshold is defined, it is the responsibility of the LMS
-        //to maintain congruence between the cmi.completion_threshold,
-        //cmi.progress_measure, and the value used by the LMS for
-        //cmi.completion_status. The LMS must report (when requested via a
-        //GetValue() call) cmi.completion_status by adhering to the requirements
-        //defined in section 4.2.4.1: Completion Status Evaluation.
-        it("TODO")
+        describe("when completion_threshold is defined", () => {
+            it("returns incomplete if progress_measure < completion_threshold", () => {
+                const cmi = {
+                    completionThreshold: "0.5",
+                    progressMeasure: "0.1"
+                }
+
+                const api = new API(cmi)
+                api.Initialize("")
+
+                const value = api.GetValue("cmi.completion_status")
+                assert.strictEqual(value, "incomplete")
+            })
+
+            it("returns completed if progress_measure >= completion_threshold", () => {
+                const cmi = {
+                    completionThreshold: "0.5",
+                    progressMeasure: "0.5"
+                }
+
+                const api = new API(cmi)
+                api.Initialize("")
+
+                const value = api.GetValue("cmi.completion_status")
+                assert.strictEqual(value, "completed")
+            })
+
+            it("returns unknown if progress_measure is not set", () => {
+                const cmi = {
+                    completionHhreshold: "0.5"
+                }
+
+                const api = new API(cmi)
+                api.Initialize("")
+
+                const value = api.GetValue("cmi.completion_status")
+                assert.strictEqual(value, "unknown")
+            })
+        })
     })
 
     describe("Completion Threshold", () => {
@@ -334,6 +366,10 @@ describe("Data Model", () => {
             const cmi = { credit: "batman" }
             assert.throws(() => new API(cmi))
         })
+    })
+
+    describe("Entry", () => {
+        it("TODO")
     })
 
     describe("Exit", () => {

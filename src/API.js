@@ -2,7 +2,6 @@ import { createNanoEvents } from "nanoevents"
 import isUndefined from "lodash/isUndefined.js"
 import isValid from "date-fns/isValid/index.js"
 import parseISO from "date-fns/parseISO/index.js"
-import formatISO from "date-fns/formatISO/index.js"
 
 const NoError = "0"
 
@@ -282,6 +281,24 @@ class CompletionStatus extends SimpleElement {
         super(completionStatus)
     }
 
+    getValue(cmi) {
+        if (!isUndefined(cmi.completionThreshold)) {
+            if (!isUndefined(cmi.progressMeasure)) {
+                const th = parseFloat(cmi.completionThreshold)
+                const pr = parseFloat(cmi.progressMeasure)
+                if (pr >= th) {
+                    return "completed"
+                } else {
+                    return "incomplete"
+                }
+            } else {
+                return "unknown"
+            }
+        } else {
+            return this.value
+        }
+    }
+
     setValue(value) {
         if (!["completed", "incomplete", "not attempted", "unknown"].includes(value)) {
             throw new TypeMismatchError()
@@ -503,7 +520,7 @@ export default class API {
             const modelElement = this.cmi.access(rest, false)
             if (modelElement) {
                 try {
-                    const value = modelElement.getValue()
+                    const value = modelElement.getValue(this.cmi.export())
                     this.#setErrorCode(NoError)
                     this.#emit("call", "GetValue", [element], value)
                     return value
