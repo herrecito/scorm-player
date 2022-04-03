@@ -241,7 +241,7 @@ describe("Data Model", () => {
     describe("Comments From LMS", () => {
         it("works", () => {
             const cmi = {
-                commentsFromLMS: [{
+                comments_from_lms: [{
                     comment: "text",
                     location: "1",
                     timestamp: "2022-04-03T21:59:00Z"
@@ -252,12 +252,12 @@ describe("Data Model", () => {
             api.Initialize("")
 
             const value = api.GetValue("cmi.comments_from_lms.0.timestamp")
-            assert.strictEqual(value, cmi.commentsFromLMS[0].timestamp)
+            assert.strictEqual(value, cmi.comments_from_lms[0].timestamp)
         })
 
         it("is read-only", () => {
             const cmi = {
-                commentsFromLMS: [{
+                comments_from_lms: [{
                     comment: "text",
                     location: "1",
                     timestamp: "2022-04-03T21:59:00Z"
@@ -290,8 +290,8 @@ describe("Data Model", () => {
         describe("when completion_threshold is defined", () => {
             it("returns incomplete if progress_measure < completion_threshold", () => {
                 const cmi = {
-                    completionThreshold: "0.5",
-                    progressMeasure: "0.1"
+                    completion_threshold: "0.5",
+                    progress_measure: "0.1"
                 }
 
                 const api = new API(cmi)
@@ -303,8 +303,8 @@ describe("Data Model", () => {
 
             it("returns completed if progress_measure >= completion_threshold", () => {
                 const cmi = {
-                    completionThreshold: "0.5",
-                    progressMeasure: "0.5"
+                    completion_threshold: "0.5",
+                    progress_measure: "0.5"
                 }
 
                 const api = new API(cmi)
@@ -316,7 +316,7 @@ describe("Data Model", () => {
 
             it("returns unknown if progress_measure is not set", () => {
                 const cmi = {
-                    completionHhreshold: "0.5"
+                    completion_threshold: "0.5"
                 }
 
                 const api = new API(cmi)
@@ -330,17 +330,17 @@ describe("Data Model", () => {
 
     describe("Completion Threshold", () => {
         it("must be a number", () => {
-            const cmi = { completionThreshold: "potato" }
+            const cmi = { completion_threshold: "potato" }
             assert.throws(() => new API(cmi))
         })
 
         it("doesn't allow values outside [0, 1]", () => {
-            const cmi = { completionThreshold: "2" }
+            const cmi = { completion_threshold: "2" }
             assert.throws(() => new API(cmi))
         })
 
         it("is read-only", () => {
-            const cmi = { completionThreshold: "0.5" }
+            const cmi = { completion_threshold: "0.5" }
 
             const api = new API(cmi)
             api.Initialize("")

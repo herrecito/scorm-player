@@ -118,8 +118,8 @@ class TimestampElement {
     }
 }
 
-function createCollectionClass(Element) {
-    return class Collection {
+function createCollectionElement(Element) {
+    return class {
         constructor(items=[]) {
             this.items = items.map(item => new Element(item))
         }
@@ -164,93 +164,6 @@ function createCollectionClass(Element) {
     }
 }
 
-class CMIElement {
-    constructor(cmi) {
-        this.location = new SimpleElement(cmi.location)
-        this.completionStatus = new CompletionStatus(cmi.completionStatus)
-        this.completionThreshold = new CompletionThreshold(cmi.completionThreshold)
-        this.credit = new Credit(cmi.credit)
-        this.successStatus = new SuccessStatus(cmi.successStatus)
-        this.objectives = new (createCollectionClass(Objective))(cmi.objectives)
-        this.commentsFromLearner = new (createCollectionClass(CommentFromLearner))(cmi.commentsFromLearner)
-        this.commentsFromLMS = new (createCollectionClass(CommentFromLMS))(cmi.commentsFromLMS)
-        this.progressMeasure = new ProgressMeasure(cmi.progressMeasure)
-        this.sessionTime = new SessionTime(cmi.sessionTime)
-        this.suspendData = new SuspendData(cmi.suspendData)
-        this.mode = new Mode(cmi.mode)
-        this.exit = new ExitElement()
-    }
-
-    access(path, write) {
-        const [name, ...rest] = path
-        switch (name) {
-            case "_version":
-                return new (readOnly(SimpleElement))("1.0").access(rest, write)
-
-            case "suspend_data":
-                return this.suspendData.access(rest, write)
-
-            case "location":
-                return this.location.access(rest, write)
-
-            case "completion_status":
-                return this.completionStatus.access(rest, write)
-
-            case "completion_threshold":
-                return this.completionThreshold.access(rest, write)
-
-            case "credit":
-                return this.credit.access(rest, write)
-
-            case "success_status":
-                return this.successStatus.access(rest, write)
-
-            case "comments_from_learner":
-                return this.commentsFromLearner.access(rest, write)
-
-            case "comments_from_lms":
-                return this.commentsFromLMS.access(rest, write)
-
-            case "objectives":
-                return this.objectives.access(rest, write)
-
-            case "progress_measure":
-                return this.progressMeasure.access(rest, write)
-
-            case "exit":
-                return this.exit.access(rest, write)
-
-            case "mode":
-                return this.mode.access(rest, write)
-
-            case "session_time":
-                return this.sessionTime.access(rest, write)
-
-            default:
-                return null
-        }
-    }
-
-    export() {
-        return {
-            location: this.location.export(),
-            completionStatus: this.completionStatus.export(),
-            completionThreshold: this.completionThreshold.export(),
-            credit: this.credit.export(),
-            successStatus: this.successStatus.export(),
-            objectives: this.objectives.export(),
-            suspendData: this.suspendData.export(),
-            progressMeasure: this.progressMeasure.export(),
-            exit: this.exit.export(),
-            mode: this.mode.export(),
-            sessionTime: this.sessionTime.export()
-        }
-    }
-}
-
-class SuspendData extends SimpleElement {
-}
-
 const Mode = readOnly(class extends SimpleElement {
     constructor(mode="normal") {
         super(mode)
@@ -282,10 +195,10 @@ class CompletionStatus extends SimpleElement {
     }
 
     getValue(cmi) {
-        if (!isUndefined(cmi.completionThreshold)) {
-            if (!isUndefined(cmi.progressMeasure)) {
-                const th = parseFloat(cmi.completionThreshold)
-                const pr = parseFloat(cmi.progressMeasure)
+        if (!isUndefined(cmi.completion_threshold)) {
+            if (!isUndefined(cmi.progress_measure)) {
+                const th = parseFloat(cmi.completion_threshold)
+                const pr = parseFloat(cmi.progress_measure)
                 if (pr >= th) {
                     return "completed"
                 } else {
@@ -314,101 +227,54 @@ class SuccessStatus extends SimpleElement {
     }
 }
 
-class CommentFromLearner {
-    static children = ["comment", "location", "timestamp"] // TODO
+// children: { [name: string]: Constructor }
+function createAggregateElement(children) {
+    return class {
+        static children = Object.keys(children)
 
-    constructor(commentFromLearner) {
-        this.comment = new SimpleElement(commentFromLearner?.comment)
-        this.location = new SimpleElement(commentFromLearner?.location)
-        this.timestamp = new TimestampElement(commentFromLearner?.timestamp)
-    }
+        constructor(value) {
+            for (const [name, constructor] of Object.entries(children)) {
+                this[name] = new constructor(value?.[name])
+            }
+        }
 
-    getValue() {
-        throw new Error()
-    }
+        access(path, write) {
+            const [name, ...rest] = path
+            if (name in children) {
+                return this[name].access(rest, write)
+            } else {
+                return null
+            }
+        }
 
-    setValue() {
-        throw new Error()
-    }
-
-    access(path, write) {
-        const [name, ...rest] = path
-        switch (name) {
-            case "comment": return this.comment.access(rest, write)
-            case "location": return this.location.access(rest, write)
-            case "timestamp": return this.timestamp.access(rest, write)
-            default: return null
+        export() {
+            const obj = {}
+            for (const name of Object.keys(children)) {
+                obj[name] = this[name].export()
+            }
+            return obj
         }
     }
 }
 
-class CommentFromLMS {
-    static children = ["comment", "location", "timestamp"] // TODO
+const CommentFromLearner = createAggregateElement({
+    comment:   SimpleElement,
+    location:  SimpleElement,
+    timestamp: TimestampElement,
+})
 
-    constructor(commentFromLearner) {
-        this.comment = new (readOnly (SimpleElement))(commentFromLearner?.comment)
-        this.location = new (readOnly(SimpleElement))(commentFromLearner?.location)
-        this.timestamp = new (readOnly(TimestampElement))(commentFromLearner?.timestamp)
-    }
+const CommentFromLms = createAggregateElement({
+    comment:   readOnly(SimpleElement),
+    location:  readOnly(SimpleElement),
+    timestamp: readOnly(TimestampElement),
+})
 
-    getValue() {
-        throw new Error()
-    }
 
-    setValue() {
-        throw new Error()
-    }
-
-    access(path, write) {
-        const [name, ...rest] = path
-        switch (name) {
-            case "comment": return this.comment.access(rest, write)
-            case "location": return this.location.access(rest, write)
-            case "timestamp": return this.timestamp.access(rest, write)
-            default: return null
-        }
-    }
-}
-
-class Objective {
-    constructor(objective) {
-        this.id = new ObjectiveId(objective.id)
-        this.progressMeasure = new ProgressMeasure(objective.progressMeasure)
-        this.completionStatus = new CompletionStatus(objective.progressMeasure)
-    }
-
-    getValue() {
-        throw new Error()
-    }
-
-    setValue() {
-        throw new Error()
-    }
-
-    access(path, write) {
-        const [name, ...rest] = path
-        switch (name) {
-            case "id": return this.id.access(rest, write)
-            case "progress_measure": return this.progressMeasure.access(rest, write)
-            case "completion_status": return this.completionStatus.access(rest, write)
-            default: return null
-        }
-    }
-
-    export() {
-        return {
-            id: this.id.export(),
-            progressMeasure: this.progressMeasure.export(),
-            completionStatus: this.completionStatus.export()
-        }
-    }
-}
-
-class ObjectiveId extends SimpleElement {
-}
-
-class ProgressMeasure extends SimpleElement {
-}
+const Objective = createAggregateElement({
+    id:                SimpleElement,
+    progress_measure:  SimpleElement,
+    completion_status: CompletionStatus,
+})
 
 class ExitElement extends SimpleElement {
     // TODO validate when initializing? allow initializing with a value?
@@ -424,9 +290,24 @@ class ExitElement extends SimpleElement {
     }
 }
 
-class SessionTime extends SimpleElement {
-}
 
+const CMIElement = createAggregateElement({
+    _version: readOnly(class extends SimpleElement { constructor() { super("1.0") } }),
+
+    location: SimpleElement,
+    completion_status: CompletionStatus,
+    completion_threshold: CompletionThreshold,
+    credit: Credit,
+    success_status: SuccessStatus,
+    objectives: createCollectionElement(Objective),
+    comments_from_learner: createCollectionElement(CommentFromLearner),
+    comments_from_lms: createCollectionElement(CommentFromLms),
+    progress_measure: SimpleElement,
+    session_time: SimpleElement,
+    suspend_data: SimpleElement,
+    mode: Mode,
+    exit: ExitElement,
+})
 
 export default class API {
     #emitter = createNanoEvents()
