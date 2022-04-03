@@ -170,6 +170,7 @@ class CMIElement {
         this.location = new SimpleElement(cmi.location)
         this.completionStatus = new CompletionStatus(cmi.completionStatus)
         this.completionThreshold = new CompletionThreshold(cmi.completionThreshold)
+        this.credit = new Credit(cmi.credit)
         this.successStatus = new SuccessStatus(cmi.successStatus)
         this.objectives = new (createCollectionClass(Objective))(cmi.objectives)
         this.commentsFromLearner = new (createCollectionClass(CommentFromLearner))(cmi.commentsFromLearner)
@@ -198,6 +199,9 @@ class CMIElement {
 
             case "completion_threshold":
                 return this.completionThreshold.access(rest, write)
+
+            case "credit":
+                return this.credit.access(rest, write)
 
             case "success_status":
                 return this.successStatus.access(rest, write)
@@ -233,6 +237,7 @@ class CMIElement {
             location: this.location.export(),
             completionStatus: this.completionStatus.export(),
             completionThreshold: this.completionThreshold.export(),
+            credit: this.credit.export(),
             successStatus: this.successStatus.export(),
             objectives: this.objectives.export(),
             suspendData: this.suspendData.export(),
@@ -265,6 +270,13 @@ const CompletionThreshold = readOnly(class extends SimpleElement {
     }
 })
 
+const Credit = readOnly(class extends SimpleElement {
+    constructor(credit="credit") {
+        if (!["credit", "no credit"].includes(credit)) throw new Error()
+        super(credit)
+    }
+})
+
 class CompletionStatus extends SimpleElement {
     constructor(completionStatus="unknown") {
         super(completionStatus)
@@ -278,6 +290,7 @@ class CompletionStatus extends SimpleElement {
     }
 }
 
+// TODO is an enum
 class SuccessStatus extends SimpleElement {
     constructor(successStatus="unknown") {
         super(successStatus)

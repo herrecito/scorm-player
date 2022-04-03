@@ -321,6 +321,21 @@ describe("Data Model", () => {
         })
     })
 
+    describe("Credit", () => {
+        it("returns 'credit' by default", () => {
+            const api = new API()
+            api.Initialize("")
+
+            const value = api.GetValue("cmi.credit")
+            assert.strictEqual(value, "credit")
+        })
+
+        it("can't be initialized to an invalid value", () => {
+            const cmi = { credit: "batman" }
+            assert.throws(() => new API(cmi))
+        })
+    })
+
     describe("Exit", () => {
         it("fails for invalid values", () => {
             const api = new API()
