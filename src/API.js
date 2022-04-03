@@ -1,4 +1,8 @@
 import { createNanoEvents } from "nanoevents"
+import isUndefined from "lodash/isUndefined.js"
+import isValid from "date-fns/isValid/index.js"
+import parseISO from "date-fns/parseISO/index.js"
+import formatISO from "date-fns/formatISO/index.js"
 
 const NoError = "0"
 
@@ -50,6 +54,14 @@ class ValueNotInitializederror extends Error {
 class OutOfBoundError extends Error {
 }
 
+function readOnly(Element) {
+    return class extends Element {
+        setValue() {
+            throw new ReadOnlyError()
+        }
+    }
+}
+
 class SimpleElement {
     constructor(value) {
         this.value = value
@@ -78,9 +90,32 @@ class SimpleElement {
     }
 }
 
-class ROSimpleElement extends SimpleElement {
-    setValue() {
-        throw new ReadOnlyError()
+class TimestampElement {
+    constructor(value) {
+        this.value = value
+    }
+
+    getValue() {
+        if (this.value === undefined) throw new ValueNotInitializederror()
+
+        return this.value
+    }
+
+    setValue(value) {
+        if (!isValid(parseISO(value))) throw new TypeMismatchError() // TODO pass value to error
+        this.value = value
+    }
+
+    access(path) {
+        if (path.length === 0) {
+            return this
+        } else {
+            return null
+        }
+    }
+
+    export() {
+        return this.value
     }
 }
 
@@ -102,11 +137,11 @@ function createCollectionClass(Element) {
             const [name, ...rest] = path
             switch (name) {
                 case "_count": {
-                    return new ROSimpleElement(this.items.length.toString()).access(rest, write)
+                    return new (readOnly(SimpleElement))(this.items.length.toString()).access(rest, write)
                 }
 
                 case "_children": {
-                    return new ROSimpleElement(Element.children.join(",")).access(rest, write)
+                    return new (readOnly(SimpleElement))(Element.children.join(",")).access(rest, write)
                 }
 
                 default: {
@@ -132,11 +167,13 @@ function createCollectionClass(Element) {
 
 class CMIElement {
     constructor(cmi) {
-        this.location = new Location(cmi.location)
+        this.location = new SimpleElement(cmi.location)
         this.completionStatus = new CompletionStatus(cmi.completionStatus)
+        this.completionThreshold = new CompletionThreshold(cmi.completionThreshold)
         this.successStatus = new SuccessStatus(cmi.successStatus)
         this.objectives = new (createCollectionClass(Objective))(cmi.objectives)
         this.commentsFromLearner = new (createCollectionClass(CommentFromLearner))(cmi.commentsFromLearner)
+        this.commentsFromLMS = new (createCollectionClass(CommentFromLMS))(cmi.commentsFromLMS)
         this.progressMeasure = new ProgressMeasure(cmi.progressMeasure)
         this.sessionTime = new SessionTime(cmi.sessionTime)
         this.suspendData = new SuspendData(cmi.suspendData)
@@ -148,7 +185,7 @@ class CMIElement {
         const [name, ...rest] = path
         switch (name) {
             case "_version":
-                return new ROSimpleElement("1.0").access(rest, write)
+                return new (readOnly(SimpleElement))("1.0").access(rest, write)
 
             case "suspend_data":
                 return this.suspendData.access(rest, write)
@@ -159,11 +196,17 @@ class CMIElement {
             case "completion_status":
                 return this.completionStatus.access(rest, write)
 
+            case "completion_threshold":
+                return this.completionThreshold.access(rest, write)
+
             case "success_status":
                 return this.successStatus.access(rest, write)
 
             case "comments_from_learner":
                 return this.commentsFromLearner.access(rest, write)
+
+            case "comments_from_lms":
+                return this.commentsFromLMS.access(rest, write)
 
             case "objectives":
                 return this.objectives.access(rest, write)
@@ -189,6 +232,7 @@ class CMIElement {
         return {
             location: this.location.export(),
             completionStatus: this.completionStatus.export(),
+            completionThreshold: this.completionThreshold.export(),
             successStatus: this.successStatus.export(),
             objectives: this.objectives.export(),
             suspendData: this.suspendData.export(),
@@ -203,15 +247,34 @@ class CMIElement {
 class SuspendData extends SimpleElement {
 }
 
-class Mode extends ROSimpleElement {
+const Mode = readOnly(class extends SimpleElement {
     constructor(mode="normal") {
         super(mode)
     }
-}
+})
+
+const CompletionThreshold = readOnly(class extends SimpleElement {
+    constructor(completionThreshold) {
+        if (!isUndefined(completionThreshold)) {
+            const th = parseFloat(completionThreshold)
+            if (Number.isNaN(th)) throw new Error()
+            if (th < 0) throw new Error()
+            if (th > 1) throw new Error()
+        }
+        super(completionThreshold)
+    }
+})
 
 class CompletionStatus extends SimpleElement {
     constructor(completionStatus="unknown") {
         super(completionStatus)
+    }
+
+    setValue(value) {
+        if (!["completed", "incomplete", "not attempted", "unknown"].includes(value)) {
+            throw new TypeMismatchError()
+        }
+        this.value = value
     }
 }
 
@@ -221,18 +284,13 @@ class SuccessStatus extends SimpleElement {
     }
 }
 
-class Location extends SimpleElement {
-}
-
-class Comment extends SimpleElement {
-}
-
 class CommentFromLearner {
-    static children = ["comment", "location"]
+    static children = ["comment", "location", "timestamp"] // TODO
 
     constructor(commentFromLearner) {
-        this.comment = new Comment(commentFromLearner?.comment)
-        this.location = new Location(commentFromLearner?.location)
+        this.comment = new SimpleElement(commentFromLearner?.comment)
+        this.location = new SimpleElement(commentFromLearner?.location)
+        this.timestamp = new TimestampElement(commentFromLearner?.timestamp)
     }
 
     getValue() {
@@ -248,6 +306,35 @@ class CommentFromLearner {
         switch (name) {
             case "comment": return this.comment.access(rest, write)
             case "location": return this.location.access(rest, write)
+            case "timestamp": return this.timestamp.access(rest, write)
+            default: return null
+        }
+    }
+}
+
+class CommentFromLMS {
+    static children = ["comment", "location", "timestamp"] // TODO
+
+    constructor(commentFromLearner) {
+        this.comment = new (readOnly (SimpleElement))(commentFromLearner?.comment)
+        this.location = new (readOnly(SimpleElement))(commentFromLearner?.location)
+        this.timestamp = new (readOnly(TimestampElement))(commentFromLearner?.timestamp)
+    }
+
+    getValue() {
+        throw new Error()
+    }
+
+    setValue() {
+        throw new Error()
+    }
+
+    access(path, write) {
+        const [name, ...rest] = path
+        switch (name) {
+            case "comment": return this.comment.access(rest, write)
+            case "location": return this.location.access(rest, write)
+            case "timestamp": return this.timestamp.access(rest, write)
             default: return null
         }
     }

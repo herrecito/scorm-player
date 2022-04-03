@@ -187,7 +187,7 @@ describe("Data Model", () => {
             api.Initialize("")
 
             const value = api.GetValue("cmi.comments_from_learner._children")
-            assert.strictEqual(value, "comment,location")
+            assert.strictEqual(value, "comment,location,timestamp")
         })
 
         it("allows creating new records by writing to comment", () => {
@@ -224,6 +224,100 @@ describe("Data Model", () => {
 
             const errorCode = api.GetLastError()
             assert.strictEqual(errorCode, "351")
+        })
+
+        it("fails for invalid timestamp", () => {
+            const api = new API()
+            api.Initialize("")
+
+            const result = api.SetValue("cmi.comments_from_learner.0.timestamp", "batman")
+            assert.strictEqual(result, "false")
+
+            const errorCode = api.GetLastError()
+            assert.strictEqual(errorCode, "406")
+        })
+    })
+
+    describe("Comments From LMS", () => {
+        it("works", () => {
+            const cmi = {
+                commentsFromLMS: [{
+                    comment: "text",
+                    location: "1",
+                    timestamp: "2022-04-03T21:59:00Z"
+                }]
+            }
+
+            const api = new API(cmi)
+            api.Initialize("")
+
+            const value = api.GetValue("cmi.comments_from_lms.0.timestamp")
+            assert.strictEqual(value, cmi.commentsFromLMS[0].timestamp)
+        })
+
+        it("is read-only", () => {
+            const cmi = {
+                commentsFromLMS: [{
+                    comment: "text",
+                    location: "1",
+                    timestamp: "2022-04-03T21:59:00Z"
+                }]
+            }
+
+            const api = new API(cmi)
+            api.Initialize("")
+
+            const result = api.SetValue("cmi.comments_from_lms.0.comment", "hello")
+            assert.strictEqual(result, "false")
+
+            const errorCode = api.GetLastError()
+            assert.strictEqual(errorCode, "404")
+        })
+    })
+
+    describe("Completion Status", () => {
+        it("fails for invalid values", () => {
+            const api = new API()
+            api.Initialize("")
+
+            const result = api.SetValue("cmi.completion_status", "batman")
+            assert.strictEqual(result, "false")
+
+            const errorCode = api.GetLastError()
+            assert.strictEqual(errorCode, "406")
+        })
+
+        //If a cmi.completion_threshold is defined, it is the responsibility of the LMS
+        //to maintain congruence between the cmi.completion_threshold,
+        //cmi.progress_measure, and the value used by the LMS for
+        //cmi.completion_status. The LMS must report (when requested via a
+        //GetValue() call) cmi.completion_status by adhering to the requirements
+        //defined in section 4.2.4.1: Completion Status Evaluation.
+        it("TODO")
+    })
+
+    describe("Completion Threshold", () => {
+        it("must be a number", () => {
+            const cmi = { completionThreshold: "potato" }
+            assert.throws(() => new API(cmi))
+        })
+
+        it("doesn't allow values outside [0, 1]", () => {
+            const cmi = { completionThreshold: "2" }
+            assert.throws(() => new API(cmi))
+        })
+
+        it("is read-only", () => {
+            const cmi = { completionThreshold: "0.5" }
+
+            const api = new API(cmi)
+            api.Initialize("")
+
+            const result = api.SetValue("cmi.completion_threshold", "0.6")
+            assert.strictEqual(result, "false")
+
+            const errorCode = api.GetLastError()
+            assert.strictEqual(errorCode, "404")
         })
     })
 
