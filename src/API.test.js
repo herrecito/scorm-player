@@ -420,6 +420,17 @@ describe("Data Model", () => {
             result = api.SetValue("cmi.interactions.0.objectives.2.id", "objective0")
             assert.strictEqual(result, "false")
         })
+
+        it("fails when trying to create by setting anything other than the id", () => {
+            const api = new API()
+            api.Initialize("")
+
+            const result = api.SetValue("cmi.interactions.0.timestamp", "2022-03-22T00:00:00Z")
+            assert.strictEqual(result, "false")
+
+            const errorCode = api.GetLastError()
+            assert.strictEqual(errorCode, "408")
+        })
     })
 
     describe("Suspend Data", () => {
@@ -463,7 +474,5 @@ describe("Data Model", () => {
             assert.strictEqual(api.GetValue("cmi.objectives._count"), "3")
             assert.strictEqual(api.GetValue("cmi.objectives.1.id"), "obj2")
         })
-
-        it("only allow creating a new objective by setting the id")
     })
 })

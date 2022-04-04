@@ -56,6 +56,18 @@ class OutOfBoundError extends Error {
 class DuplicatedObjectiveIdError extends Error {
 }
 
+class TargetNotCreatableError extends Error {
+}
+
+function creatable(Element) {
+    return class extends Element {
+        constructor(...args) {
+            super(...args)
+            this.creatable = true
+        }
+    }
+}
+
 function writeOnly(Element) {
     return class extends Element {
         getValue() {
@@ -161,10 +173,12 @@ function createCollectionElement(Element) {
                     const index = parseInt(name, 10)
                     if (index in this.items) {
                         return this.items[index].access(rest, write)
-                    } else if (index >= 0 && index <= this.items.length) {
+                    } else if (write && index >= 0 && index <= this.items.length) {
                         const element = new Element(undefined, this)
+                        const target = element.access(rest, write)
+                        if (!target.creatable) throw new TargetNotCreatableError()
                         this.items[index] = element
-                        return element.access(rest, write)
+                        return target
                     } else {
                         throw new OutOfBoundError()
                     }
@@ -273,9 +287,9 @@ function createAggregateElement(children) {
 }
 
 const CommentFromLearner = createAggregateElement({
-    comment:   SimpleElement,
-    location:  SimpleElement,
-    timestamp: TimestampElement,
+    comment:   creatable(SimpleElement),
+    location:  creatable(SimpleElement),
+    timestamp: creatable(TimestampElement),
 })
 
 const CommentFromLms = createAggregateElement({
@@ -304,16 +318,17 @@ class ObjectiveIdId extends SimpleElement {
 }
 
 const ObjectiveId = createAggregateElement({
-    id: ObjectiveIdId
+    id: creatable(ObjectiveIdId)
 })
 
 const Interaction = createAggregateElement({
-    id: SimpleElement,
+    id: creatable(SimpleElement),
     type: createEnumElement([
         "true-false", "choice", "fill-in", "long-fill-in", "likert", "matching", "performance",
         "sequencing", "numeric", "other"
     ]),
-    objectives: createCollectionElement(ObjectiveId)
+    objectives: createCollectionElement(ObjectiveId),
+    timestamp: TimestampElement
 })
 
 function createEnumElement(validValues) {
@@ -481,7 +496,7 @@ export default class API {
         const [name, ...rest] = element.split(".")
         if (name === "cmi") {
             try {
-                const modelElement = this.cmi.access(rest, false)
+                const modelElement = this.cmi.access(rest, true)
                 if (modelElement) {
                     try {
                         modelElement.setValue(value)
@@ -514,6 +529,10 @@ export default class API {
                 if (error instanceof OutOfBoundError) {
                     this.#setErrorCode(GeneralSetFailure)
                     this.#emit("call", "SetValue", [element, value], "false", true)
+                    return "false"
+                } else if (error instanceof TargetNotCreatableError) {
+                    this.#setErrorCode(DataModelDependencyNotEstablished)
+                    this.#emit("call", "GetValue", [element], "", true)
                     return "false"
                 } else {
                     throw error
