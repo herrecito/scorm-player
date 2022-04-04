@@ -53,6 +53,17 @@ class ValueNotInitializederror extends Error {
 class OutOfBoundError extends Error {
 }
 
+class DuplicatedObjectiveIdError extends Error {
+}
+
+function writeOnly(Element) {
+    return class extends Element {
+        getValue() {
+            throw new WriteOnlyError()
+        }
+    }
+}
+
 function readOnly(Element) {
     return class extends Element {
         setValue() {
@@ -62,8 +73,9 @@ function readOnly(Element) {
 }
 
 class SimpleElement {
-    constructor(value) {
+    constructor(value, parent) {
         this.value = value
+        this.parent = parent
     }
 
     getValue() {
@@ -90,8 +102,9 @@ class SimpleElement {
 }
 
 class TimestampElement {
-    constructor(value) {
+    constructor(value, parent) {
         this.value = value
+        this.parent = parent
     }
 
     getValue() {
@@ -120,8 +133,9 @@ class TimestampElement {
 
 function createCollectionElement(Element) {
     return class {
-        constructor(items=[]) {
+        constructor(items=[], parent) {
             this.items = items.map(item => new Element(item))
+            this.parent = parent
         }
 
         getValue() {
@@ -136,11 +150,11 @@ function createCollectionElement(Element) {
             const [name, ...rest] = path
             switch (name) {
                 case "_count": {
-                    return new (readOnly(SimpleElement))(this.items.length.toString()).access(rest, write)
+                    return new (readOnly(SimpleElement))(this.items.length.toString(), this).access(rest, write)
                 }
 
                 case "_children": {
-                    return new (readOnly(SimpleElement))(Element.children.join(",")).access(rest, write)
+                    return new (readOnly(SimpleElement))(Element.children.join(","), this).access(rest, write)
                 }
 
                 default: {
@@ -148,7 +162,7 @@ function createCollectionElement(Element) {
                     if (index in this.items) {
                         return this.items[index].access(rest, write)
                     } else if (index >= 0 && index <= this.items.length) {
-                        const element = new Element()
+                        const element = new Element(undefined, this)
                         this.items[index] = element
                         return element.access(rest, write)
                     } else {
@@ -232,10 +246,11 @@ function createAggregateElement(children) {
     return class {
         static children = Object.keys(children)
 
-        constructor(value) {
+        constructor(value, parent) {
             for (const [name, constructor] of Object.entries(children)) {
-                this[name] = new constructor(value?.[name])
+                this[name] = new constructor(value?.[name], this)
             }
+            this.parent = parent
         }
 
         access(path, write) {
@@ -276,20 +291,39 @@ const Objective = createAggregateElement({
     completion_status: CompletionStatus,
 })
 
-class ExitElement extends SimpleElement {
-    // TODO validate when initializing? allow initializing with a value?
-
+class ObjectiveIdId extends SimpleElement {
     setValue(value) {
-        const validValues = ["time-out", "suspend", "logout", "normal", ""]
-        if (!validValues.includes(value)) throw new TypeMismatchError()
-        this.value = value
-    }
+        const objectiveId = this.parent
+        const objectives = objectiveId.parent
+        if (objectives.export().some(o => o.id === value)) {
+            throw new DuplicatedObjectiveIdError()
+        }
 
-    getValue() {
-        throw new WriteOnlyError()
+        this.value = value
     }
 }
 
+const ObjectiveId = createAggregateElement({
+    id: ObjectiveIdId
+})
+
+const Interaction = createAggregateElement({
+    id: SimpleElement,
+    type: createEnumElement([
+        "true-false", "choice", "fill-in", "long-fill-in", "likert", "matching", "performance",
+        "sequencing", "numeric", "other"
+    ]),
+    objectives: createCollectionElement(ObjectiveId)
+})
+
+function createEnumElement(validValues) {
+    return class extends SimpleElement {
+        setValue(value) {
+            if (!validValues.includes(value)) throw new TypeMismatchError()
+            this.value = value
+        }
+    }
+}
 
 const CMIElement = createAggregateElement({
     _version: readOnly(class extends SimpleElement { constructor() { super("1.0") } }),
@@ -299,6 +333,7 @@ const CMIElement = createAggregateElement({
     completion_threshold: CompletionThreshold,
     credit: Credit,
     success_status: SuccessStatus,
+    interactions: createCollectionElement(Interaction),
     objectives: createCollectionElement(Objective),
     comments_from_learner: createCollectionElement(CommentFromLearner),
     comments_from_lms: createCollectionElement(CommentFromLms),
@@ -306,7 +341,7 @@ const CMIElement = createAggregateElement({
     session_time: SimpleElement,
     suspend_data: SimpleElement,
     mode: Mode,
-    exit: ExitElement,
+    exit: writeOnly(createEnumElement(["time-out", "suspend", "logout", "normal", ""])),
 })
 
 export default class API {
@@ -401,7 +436,7 @@ export default class API {
             const modelElement = this.cmi.access(rest, false)
             if (modelElement) {
                 try {
-                    const value = modelElement.getValue(this.cmi.export())
+                    const value = modelElement.getValue(this.cmi.export()) // TODO
                     this.#setErrorCode(NoError)
                     this.#emit("call", "GetValue", [element], value)
                     return value
@@ -460,6 +495,10 @@ export default class API {
                             return "false"
                         } else if (error instanceof TypeMismatchError) {
                             this.#setErrorCode(DataModelElementTypeMismatch)
+                            this.#emit("call", "SetValue", [element, value], "false", true)
+                            return "false"
+                        } else if (error instanceof DuplicatedObjectiveIdError) {
+                            this.#setErrorCode(GeneralSetFailure)
                             this.#emit("call", "SetValue", [element, value], "false", true)
                             return "false"
                         } else {

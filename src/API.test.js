@@ -362,14 +362,21 @@ describe("Data Model", () => {
             assert.strictEqual(value, "credit")
         })
 
-        it("can't be initialized to an invalid value", () => {
+        it("can't be initialized with an invalid value", () => {
             const cmi = { credit: "batman" }
             assert.throws(() => new API(cmi))
         })
     })
 
     describe("Entry", () => {
-        it("TODO")
+        // TODO
+        it("works", () => {
+            const api = new API()
+            api.Initialize("")
+
+            const value = api.GetValue("cmi.entry")
+            assert.strictEqual(value, "")
+        })
     })
 
     describe("Exit", () => {
@@ -393,6 +400,25 @@ describe("Data Model", () => {
 
             const errorCode = api.GetLastError()
             assert.strictEqual(errorCode, "405")
+        })
+    })
+
+    describe("Interactions", () => {
+        it("fails if the objective id is already used in an interaction", () => {
+            const api = new API()
+            api.Initialize("")
+
+            let result = api.SetValue("cmi.interactions.0.id", "interaction0")
+            assert.strictEqual(result, "true")
+
+            result = api.SetValue("cmi.interactions.0.objectives.0.id", "objective0")
+            assert.strictEqual(result, "true")
+
+            result = api.SetValue("cmi.interactions.0.objectives.1.id", "objective1")
+            assert.strictEqual(result, "true")
+
+            result = api.SetValue("cmi.interactions.0.objectives.2.id", "objective0")
+            assert.strictEqual(result, "false")
         })
     })
 
