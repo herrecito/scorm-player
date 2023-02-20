@@ -55,58 +55,7 @@ import ScormLoadEvent from "./ScormLoadEvent.vue"
 import PersistEvent from "./PersistEvent.vue"
 
 import API from "./API.js"
-
-function manifest2cmi(manifest) {
-    const organizations = manifest.querySelector("organizations")
-    const defaultOrganizationId = organizations.getAttribute("default")
-
-    const defaultOrganization = organizations.querySelector(
-        `organization[identifier=${defaultOrganizationId}]`)
-
-    // TODO no multi-sco support
-    const item = defaultOrganization.querySelector("item")
-
-    const oids = []
-    const imsssObjectives = item.querySelector("objectives")
-    if (imsssObjectives) {
-        const objectives = imsssObjectives.querySelectorAll("objective")
-        for (const objective of objectives) {
-            const oid = objective.getAttribute("objectiveID")
-            oids.push(oid)
-        }
-    }
-
-    return {
-        objectives: oids.map(id => ({ id }))
-    }
-}
-
-function manifest2hrefs(manifest) {
-    const organizations = manifest.querySelector("organizations")
-    const defaultOrganizationId = organizations.getAttribute("default")
-
-    const defaultOrganization = organizations.querySelector(
-        `organization[identifier=${defaultOrganizationId}]`)
-
-    // TODO no multi-sco support
-    const item = defaultOrganization.querySelector("item")
-
-    const resourceId = item.getAttribute("identifierref")
-
-    const resources = manifest.querySelector("resources")
-    const resource = resources.querySelector(`resource[identifier=${resourceId}]`)
-
-    const href = resource.getAttribute("href")
-    const files = resource.querySelectorAll("file")
-
-    return [href, Array.from(files).map(file => file.getAttribute("href"))]
-}
-
-async function sha256(uint8Array) {
-    const hashBuffer = await crypto.subtle.digest("SHA-256", uint8Array)
-    const hashArray = Array.from(new Uint8Array(hashBuffer))
-    return hashArray.map(b => b.toString(16).padStart(2, "0")).join("")
-}
+import { sha256, manifest2cmi, manifest2hrefs } from "./utils.js"
 
 export default {
     data() {
@@ -152,7 +101,6 @@ export default {
             const parser = new DOMParser()
             const imsManifest = parser.parseFromString(imsManifestText, "text/xml")
 
-            // TODO
             const [href, hrefs] = manifest2hrefs(imsManifest)
             // TODO isEazy SCORMs don't list all files on the manifest,
             // so we just put everything in the zip in the SW cache...
@@ -206,7 +154,6 @@ export default {
             api.on("persist", cmi => {
                 const item = window.localStorage.getItem(`${file.name}-history`)
                 const history = item ? JSON.parse(item) : []
-                // TODO delete entries if history gets too long
                 history.push({
                     timestamp: Date.now(),
                     cmi

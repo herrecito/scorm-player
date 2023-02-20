@@ -1,11 +1,53 @@
-export function lerp(a, b, t) {
-    return a + t * (b - a)
+export async function sha256(uint8Array) {
+    const hashBuffer = await crypto.subtle.digest("SHA-256", uint8Array)
+    const hashArray = Array.from(new Uint8Array(hashBuffer))
+    return hashArray.map(b => b.toString(16).padStart(2, "0")).join("")
 }
 
-export function fmap(value, inMin, inMax, outMin, outMax) {
-    return (value - inMin) * (outMax - outMin) / (inMax - inMin) + outMin
+// Creates a cmi value object from an manifest as an XML doc
+export function manifest2cmi(manifest) {
+    const organizations = manifest.querySelector("organizations")
+    const defaultOrganizationId = organizations.getAttribute("default")
+
+    const defaultOrganization = organizations.querySelector(
+        `organization[identifier=${defaultOrganizationId}]`)
+
+    // TODO no multi-sco support
+    const item = defaultOrganization.querySelector("item")
+
+    const oids = []
+    const imsssObjectives = item.querySelector("objectives")
+    if (imsssObjectives) {
+        const objectives = imsssObjectives.querySelectorAll("objective")
+        for (const objective of objectives) {
+            const oid = objective.getAttribute("objectiveID")
+            oids.push(oid)
+        }
+    }
+
+    return {
+        objectives: oids.map(id => ({ id }))
+    }
 }
 
-export function clamp(x, a, b) {
-    return Math.max(a, Math.min(x, b))
+// Given a manifest as an XML doc, returns the main resource href, and the href of all items
+export function manifest2hrefs(manifest) {
+    const organizations = manifest.querySelector("organizations")
+    const defaultOrganizationId = organizations.getAttribute("default")
+
+    const defaultOrganization = organizations.querySelector(
+        `organization[identifier=${defaultOrganizationId}]`)
+
+    // TODO no multi-sco support
+    const item = defaultOrganization.querySelector("item")
+
+    const resourceId = item.getAttribute("identifierref")
+
+    const resources = manifest.querySelector("resources")
+    const resource = resources.querySelector(`resource[identifier=${resourceId}]`)
+
+    const href = resource.getAttribute("href")
+    const files = resource.querySelectorAll("file")
+
+    return [href, Array.from(files).map(file => file.getAttribute("href"))]
 }
