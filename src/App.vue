@@ -141,9 +141,7 @@ export default {
             }
 
             const data = await file.arrayBuffer()
-
             const reader = new zip.ZipReader(new zip.BlobReader(file))
-
             const entries = await reader.getEntries()
 
             const imsManifestEntry = entries.find(e => e.filename === "imsmanifest.xml")
@@ -156,7 +154,8 @@ export default {
 
             // TODO
             const [href, hrefs] = manifest2hrefs(imsManifest)
-            // TODO isEazy SCORMs don't list all files on the manifest
+            // TODO isEazy SCORMs don't list all files on the manifest,
+            // so we just put everything in the zip in the SW cache...
             /*
             await Promise.all(hrefs.map(async href => {
                 const entry = entries.find(e => e.filename === href)
@@ -185,6 +184,7 @@ export default {
                 })
             }))
 
+            // Retrieve the CMI from the last entry on the history, or create a new one from the manifest
             const item = window.localStorage.getItem(`${file.name}-history`)
             const history = item ? JSON.parse(item) : []
             const cmi = history.length > 0 ? history.at(-1).cmi : manifest2cmi(imsManifest)
@@ -220,6 +220,7 @@ export default {
                 })
             })
 
+            // Set API and load the SCORM
             window.API_1484_11 = api
             this.iframeSrc = href
             this.iframeKey = uniqueId()

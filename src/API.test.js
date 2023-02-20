@@ -2,6 +2,27 @@ import { assert } from "chai"
 
 import API from "./API.js"
 
+class CharacterStringParser {
+    constructor(str) {
+        // TODO
+    }
+}
+
+function parseCharacterString(str) {
+    return str
+}
+
+describe.skip("parseCharacterString", () => {
+    it("works", () => {
+        const result = parseCharacterString("{lang=en}Characterstring in the English language")
+        assert.strictEqual(result, [
+            "Characterstring in the English language", [
+                ["lang", "en"]
+            ]
+        ])
+    })
+})
+
 describe("API", () => {
     describe("Initialize", () => {
         it("works", () => {
@@ -404,6 +425,23 @@ describe("Data Model", () => {
     })
 
     describe("Interactions", () => {
+        it("works", () => {
+            const api = new API()
+            api.Initialize("")
+
+            let result = api.SetValue("cmi.interactions.0.id", "id")
+            assert.strictEqual(result, "true")
+
+            result = api.SetValue("cmi.interactions.0.type", "true-false")
+            assert.strictEqual(result, "true")
+
+            result = api.SetValue("cmi.interactions.0.correct_responses.0.pattern", "true")
+            assert.strictEqual(result, "true")
+
+            const value = api.GetValue("cmi.interactions.0.correct_responses.0.pattern")
+            assert.strictEqual(result, "true")
+        })
+
         it("fails if the objective id is already used in an interaction", () => {
             const api = new API()
             api.Initialize("")
@@ -430,6 +468,38 @@ describe("Data Model", () => {
 
             const errorCode = api.GetLastError()
             assert.strictEqual(errorCode, "408")
+        })
+
+
+        it("fails when setting a pattern before having id and type", () => {
+            const api = new API()
+            api.Initialize("")
+
+            let result = api.SetValue("cmi.interactions.0.id", "id")
+            assert.strictEqual(result, "true")
+
+            result = api.SetValue("cmi.interactions.0.correct_responses.0.pattern", "foo")
+            assert.strictEqual(result, "false")
+
+            const errorCode = api.GetLastError()
+            assert.strictEqual(errorCode, "408")
+        })
+
+        it("fails for invalid patterns", () => {
+            const api = new API()
+            api.Initialize("")
+
+            let result = api.SetValue("cmi.interactions.0.id", "id")
+            assert.strictEqual(result, "true")
+
+            result = api.SetValue("cmi.interactions.0.type", "true-false")
+            assert.strictEqual(result, "true")
+
+            result = api.SetValue("cmi.interactions.0.correct_responses.0.pattern", "foo")
+            assert.strictEqual(result, "false")
+
+            const errorCode = api.GetLastError()
+            assert.strictEqual(errorCode, "351")
         })
     })
 

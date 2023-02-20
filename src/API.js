@@ -47,13 +47,16 @@ class WriteOnlyError extends Error {
 class TypeMismatchError extends Error {
 }
 
-class ValueNotInitializederror extends Error {
+class ValueNotInitializedError extends Error {
 }
 
 class OutOfBoundError extends Error {
 }
 
 class DuplicatedObjectiveIdError extends Error {
+}
+
+class InvalidPatternError extends Error {
 }
 
 class TargetNotCreatableError extends Error {
@@ -91,7 +94,7 @@ class SimpleElement {
     }
 
     getValue() {
-        if (this.value === undefined) throw new ValueNotInitializederror()
+        if (this.value === undefined) throw new ValueNotInitializedError()
 
         return this.value
     }
@@ -120,7 +123,7 @@ class TimestampElement {
     }
 
     getValue() {
-        if (this.value === undefined) throw new ValueNotInitializederror()
+        if (this.value === undefined) throw new ValueNotInitializedError()
 
         return this.value
     }
@@ -321,6 +324,43 @@ const ObjectiveId = createAggregateElement({
     id: creatable(ObjectiveIdId)
 })
 
+class Pattern extends creatable(SimpleElement) {
+    setValue(value) {
+        const correctResponse = this.parent
+        const correctResponses = correctResponse.parent
+        const interaction = correctResponses.parent
+        const type = interaction.type.export()
+        if (!type) throw new TargetNotCreatableError()
+
+        switch (type) {
+            case "true-false": {
+                if (!["true", "false"].includes(value)) {
+                    throw new InvalidPatternError()
+                }
+                break
+            }
+
+            case "choice": {
+                // TODO Should be an URI. RFC 3986.
+                if (value.trim().length === 0) {
+                    throw new InvalidPatternError()
+                }
+                break
+            }
+
+            case "fill-in": {
+                // TODO parse
+            }
+        }
+
+        this.value = value
+    }
+}
+
+const CorrectResponse = createAggregateElement({
+    pattern: Pattern
+})
+
 const Interaction = createAggregateElement({
     id: creatable(SimpleElement),
     type: createEnumElement([
@@ -328,7 +368,8 @@ const Interaction = createAggregateElement({
         "sequencing", "numeric", "other"
     ]),
     objectives: createCollectionElement(ObjectiveId),
-    timestamp: TimestampElement
+    timestamp: TimestampElement,
+    correct_responses: createCollectionElement(CorrectResponse),
 })
 
 function createEnumElement(validValues) {
@@ -460,7 +501,7 @@ export default class API {
                         this.#setErrorCode(DataModelElementIsWriteOnly)
                         this.#emit("call", "GetValue", [element], "", true)
                         return ""
-                    } else if (error instanceof ValueNotInitializederror) {
+                    } else if (error instanceof ValueNotInitializedError) {
                         this.#setErrorCode(DataModelElementValueNotInitialized)
                         this.#emit("call", "GetValue", [element], "", true)
                         return ""
@@ -510,6 +551,10 @@ export default class API {
                             return "false"
                         } else if (error instanceof TypeMismatchError) {
                             this.#setErrorCode(DataModelElementTypeMismatch)
+                            this.#emit("call", "SetValue", [element, value], "false", true)
+                            return "false"
+                        } else if (error instanceof InvalidPatternError) {
+                            this.#setErrorCode(GeneralSetFailure)
                             this.#emit("call", "SetValue", [element, value], "false", true)
                             return "false"
                         } else if (error instanceof DuplicatedObjectiveIdError) {
