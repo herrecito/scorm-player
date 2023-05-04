@@ -12,14 +12,13 @@ self.addEventListener("message", event => {
         case "put": {
             const { url, body } = message
             caches.open("scorm").then(cache => {
-                console.log("put", url)
                 cache.put(url, new Response(body))
             })
             break
         }
 
         default:
-            throw new Error("Unknown messagE")
+            throw new Error("Unknown message")
     }
 })
 

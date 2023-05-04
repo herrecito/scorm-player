@@ -14,6 +14,8 @@ export class OutOfBoundError extends Error {}
 export class DuplicatedObjectiveIdError extends Error {}
 export class InvalidPatternError extends Error {}
 export class TargetNotCreatableError extends Error {}
+
+
 //
 // Simple Model Values
 //
@@ -22,6 +24,12 @@ class SimpleElement {
     constructor(value, parent) {
         this.value = value
         this.parent = parent
+    }
+
+    get root() {
+        let p = this
+        while (p.parent) p = p.parent
+        return p
     }
 
     getValue() {
@@ -93,11 +101,13 @@ function Collection(Element) {
             const [name, ...rest] = path
             switch (name) {
                 case "_count": {
-                    return { getValue: () => this.items.length.toString() }
+                    const value = this.items.length.toString()
+                    return new (ReadOnly(SimpleElement))(value)
                 }
 
                 case "_children": {
-                    return { getValue: () => Element.children.join(",") }
+                    const value = Element.children.join(",")
+                    return new (ReadOnly(SimpleElement))(value)
                 }
 
                 default: {
@@ -215,18 +225,12 @@ class Credit extends ReadOnly(DefaultValue(Enum(["credit", "no-credit"]), "credi
 
 class CompletionStatus extends DefaultValue(Enum(["completed", "incomplete", "not attempted", "unknown"]), "unknown") {
     getValue() {
-        let root = this
-        while (root.parent) root = root.parent
-        const cmi = root.export()
-        if (!isUndefined(cmi.completion_threshold)) {
-            if (!isUndefined(cmi.progress_measure)) {
-                const th = parseFloat(cmi.completion_threshold)
-                const pr = parseFloat(cmi.progress_measure)
-                if (pr >= th) {
-                    return "completed"
-                } else {
-                    return "incomplete"
-                }
+        const { root } = this
+        const th = root.completion_threshold.value
+        const pr = root.progress_measure.value
+        if (!isUndefined(th)) {
+            if (!isUndefined(pr)) {
+                return pr >= th ? "completed" : "incomplete"
             } else {
                 return "unknown"
             }
@@ -321,20 +325,27 @@ class Interaction extends Aggregate({
     correct_responses: Collection(CorrectResponse),
 }) {}
 
+class Entry extends ReadOnly(DefaultValue(Enum(["ab-initio", "resume", ""], ""))) {}
+
+class Exit extends WriteOnly(Enum(["time-out", "suspend", "logout", "normal", ""])) {}
+
+class Mode extends ReadOnly(DefaultValue(Enum(["browse", "normal", "review"]), "normal")) {}
+
 export class CMI extends Aggregate({
     _version: ReadOnly(DefaultValue(SimpleElement, "1.0")),
-    location: SimpleElement,
+    comments_from_learner: Collection(CommentFromLearner),
+    comments_from_lms: Collection(CommentFromLms),
     completion_status: CompletionStatus,
     completion_threshold: CompletionThreshold,
     credit: Credit,
-    success_status: SuccessStatus,
+    entry: Entry,
+    exit: Exit,
     interactions: Collection(Interaction),
+    location: SimpleElement,
+    mode: Mode,
     objectives: Collection(Objective),
-    comments_from_learner: Collection(CommentFromLearner),
-    comments_from_lms: Collection(CommentFromLms),
     progress_measure: SimpleElement,
     session_time: SimpleElement,
+    success_status: SuccessStatus,
     suspend_data: SimpleElement,
-    mode: ReadOnly(DefaultValue(Enum(["browse", "normal", "review"]), "normal")),
-    exit: WriteOnly(Enum(["time-out", "suspend", "logout", "normal", ""])),
 }) {}

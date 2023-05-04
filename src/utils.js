@@ -51,3 +51,11 @@ export function manifest2hrefs(manifest) {
 
     return [href, Array.from(files).map(file => file.getAttribute("href"))]
 }
+
+export function initialEntryValue(cmi, suspendAll=false) {
+    if (!cmi) return "ab-initio"
+    if (cmi.exit === "suspend") return "resume"
+    if (cmi.exit === "logout") return "ab-initio"
+    if (suspendAll) return "resume"
+    return ""
+}

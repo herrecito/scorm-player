@@ -2,7 +2,7 @@
     <div class="h-screen flex">
         <div class="flex flex-col max-w-sm">
             <form
-                class="p-4 flex"
+                class="p-4 flex gap-2"
                 @submit.prevent="onSubmit"
             >
                 <input
@@ -10,10 +10,18 @@
                     type="file"
                 />
 
-                <button class="ml-2 border border-black px-2 py-1">
+                <button class="border border-black px-2 py-1">
                     Upload
                 </button>
+                <button
+                    type="button"
+                    class="border border-black px-2 py-1"
+                    @click="unload"
+                >
+                    Unload
+                </button>
             </form>
+
             <div class="overflow-x-auto">
                 <template v-for="event in eventLog">
                     <api-call-event
@@ -53,9 +61,15 @@ import * as zip from "@zip.js/zip.js"
 import ApiCallEvent from "./ApiCallEvent.vue"
 import ScormLoadEvent from "./ScormLoadEvent.vue"
 import PersistEvent from "./PersistEvent.vue"
+import CmiHistoryLocalStore from "./CmiHistoryLocalStore.js"
 
 import API from "./API.js"
-import { sha256, manifest2cmi, manifest2hrefs } from "./utils.js"
+import {
+    sha256,
+    manifest2cmi,
+    manifest2hrefs,
+    initialEntryValue,
+} from "./utils.js"
 
 export default {
     data() {
@@ -78,6 +92,10 @@ export default {
     },
 
     methods: {
+        unload() {
+            this.iframeSrc = ""
+        },
+
         async onSubmit() {
             const file = this.$refs.inputFile.files[0]
             if (!file) return
@@ -88,6 +106,8 @@ export default {
                 this.iframeKey = uniqueId()
                 await this.$nextTick()
             }
+
+            this.eventLog = []
 
             const data = await file.arrayBuffer()
             const reader = new zip.ZipReader(new zip.BlobReader(file))
@@ -131,43 +151,40 @@ export default {
                     }, [data.buffer])
                 })
             }))
+            await reader.close()
 
-            // Retrieve the CMI from the last entry on the history, or create a new one from the manifest
-            const item = window.localStorage.getItem(`${file.name}-history`)
-            const history = item ? JSON.parse(item) : []
-            const cmi = history.length > 0 ? history.at(-1).cmi : manifest2cmi(imsManifest)
+            // Retrieve CMI from the last entry on the history, or create a new one from the manifest
+            const store = new CmiHistoryLocalStore(await sha256(data))
+            const lastEntry = await store.last()
+            const cmi = lastEntry?.cmi ?? manifest2cmi(imsManifest)
 
-            const api = new API(cmi)
+            const api = new API({
+                ...cmi,
+                entry: initialEntryValue(lastEntry?.cmi)
+            })
 
-            api.on("call", (fn, args, returnValue) => {
+            api.on("call", async (functionName, args, returnValue) => {
                 this.eventLog.unshift({
                     key: uniqueId(),
                     timestamp: Date.now(),
                     type: "api-call",
 
-                    functionName: fn,
+                    functionName,
                     args,
                     returnValue,
                 })
+
+                if (["Terminate", "Commit"].includes(functionName)) {
+                    const timestamp = Date.now()
+                    const cmi = api.cmi.export()
+                    await store.append({ timestamp, cmi })
+                    this.eventLog.unshift({
+                        key: uniqueId(), timestamp, type: "persist"
+                    })
+                }
             })
 
-            api.on("persist", cmi => {
-                const item = window.localStorage.getItem(`${file.name}-history`)
-                const history = item ? JSON.parse(item) : []
-                history.push({
-                    timestamp: Date.now(),
-                    cmi
-                })
-                window.localStorage.setItem(`${file.name}-history`, JSON.stringify(history))
-
-                this.eventLog.unshift({
-                    key: uniqueId(),
-                    timestamp: Date.now(),
-                    type: "persist",
-                })
-            })
-
-            // Set API and load the SCORM
+            // Set API and iframe source
             window.API_1484_11 = api
             this.iframeSrc = href
             this.iframeKey = uniqueId()
@@ -178,8 +195,6 @@ export default {
 
                 name: file.name,
             })
-
-            await reader.close()
         }
     },
 

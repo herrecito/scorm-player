@@ -63,69 +63,62 @@ export default class API {
         this.errorCode = errorCode
     }
 
+    emitCall(fn, args, returnValue) {
+        this.emit("call", fn, args, returnValue)
+        return returnValue
+    }
+
     Initialize(param) {
         if (param !== "") {
             this.#setErrorCode(ErrorCodes.GeneralArgumentError)
-            this.emit("call", "Initialize", [param], "false", true)
-            return "false"
+            return this.emitCall("Initialize", [param], "false")
         }
 
         if (this.state === "running") {
             this.#setErrorCode(ErrorCodes.AlreadyInitialized)
-            this.emit("call", "Initialize", [param], "false", true)
-            return "false"
+            return this.emitCall("Initialize", [param], "false")
         }
 
         if (this.state === "terminated") {
             this.#setErrorCode(ErrorCodes.ContentInstanceTerminated)
-            this.emit("call", "Initialize", [param], "false", true)
-            return "false"
+            return this.emitCall("Initialize", [param], "false")
         }
 
         this.state = "running"
         this.#setErrorCode(ErrorCodes.NoError)
-        this.emit("call", "Initialize", [param], "true")
-        return "true"
+        return this.emitCall("Initialize", [param], "true")
     }
 
     Terminate(param) {
         if (param !== "") {
             this.#setErrorCode(ErrorCodes.GeneralArgumentError)
-            this.emit("call", "Terminate", [param], "false", true)
-            return "false"
+            return this.emitCall("Terminate", [param], "false")
         }
 
         if (this.state === "not-initialized") {
             this.#setErrorCode(ErrorCodes.TerminationBeforeInitialization)
-            this.emit("call", "Terminate", [param], "false", true)
-            return "false"
+            return this.emitCall("Terminate", [param], "false")
         }
 
         if (this.state === "terminated") {
             this.#setErrorCode(ErrorCodes.TerminationAfterTermination)
-            this.emit("call", "Terminate", [param], "false", true)
-            return "false"
+            return this.emitCall("Terminate", [param], "false")
         }
-
-        this.emit("persist", this.cmi.export())
 
         this.state = "terminated"
         this.#setErrorCode(ErrorCodes.NoError)
-        this.emit("call", "Terminate", [param], "true")
-        return "true"
+        return this.emitCall("Terminate", [param], "true")
     }
 
     GetValue(element) {
         if (this.state === "not-initialized") {
             this.#setErrorCode(ErrorCodes.RetrieveDataBeforeInitialization)
-            this.emit("call", "GetValue", [element], "", true)
-            return ""
+            return this.emitCall("GetValue", [element], "")
         }
 
         if (this.state === "terminated") {
             this.#setErrorCode(ErrorCodes.RetrieveDataAfterTermination)
-            this.emit("call", "GetValue", [element], "", true)
-            return ""
+            return this.emitCall("GetValue", [element], "")
         }
 
         const [name, ...rest] = element.split(".")
@@ -135,44 +128,37 @@ export default class API {
                 try {
                     const value = modelElement.getValue()
                     this.#setErrorCode(ErrorCodes.NoError)
-                    this.emit("call", "GetValue", [element], value)
-                    return value
+                    return this.emitCall("GetValue", [element], value)
                 } catch (error) {
                     if (error instanceof WriteOnlyError) {
                         this.#setErrorCode(ErrorCodes.DataModelElementIsWriteOnly)
-                        this.emit("call", "GetValue", [element], "", true)
-                        return ""
+                        return this.emitCall("GetValue", [element], "")
                     } else if (error instanceof ValueNotInitializedError) {
                         this.#setErrorCode(ErrorCodes.DataModelElementValueNotInitialized)
-                        this.emit("call", "GetValue", [element], "", true)
-                        return ""
+                        return this.emitCall("GetValue", [element], "")
                     } else {
                         throw error
                     }
                 }
             } else {
                 this.#setErrorCode(ErrorCodes.UndefinedDataModelElement)
-                this.emit("call", "GetValue", [element], "", true)
-                return ""
+                return this.emitCall("GetValue", [element], "")
             }
         } else {
             this.#setErrorCode(ErrorCodes.UndefinedDataModelElement)
-            this.emit("call", "GetValue", [element], "", true)
-            return ""
+            return this.emitCall("GetValue", [element], "")
         }
     }
 
     SetValue(element, value) {
         if (this.state === "not-initialized") {
             this.#setErrorCode(ErrorCodes.StoreDataBeforeTermination)
-            this.emit("call", "SetValue", [element, value], "false", true)
-            return "false"
+            return this.emitCall("SetValue", [element, value], "false")
         }
 
         if (this.state === "terminated") {
             this.#setErrorCode(ErrorCodes.StoreDataAfterTermination)
-            this.emit("call", "SetValue", [element, value], "false", true)
-            return "false"
+            return this.emitCall("SetValue", [element, value], "false")
         }
 
         const [name, ...rest] = element.split(".")
@@ -183,94 +169,76 @@ export default class API {
                     try {
                         modelElement.setValue(value)
                         this.#setErrorCode(ErrorCodes.NoError)
-                        this.emit("call", "SetValue", [element, value], "true")
-                        return "true"
+                        return this.emitCall("SetValue", [element, value], "true")
                     } catch (error) {
                         if (error instanceof ReadOnlyError) {
                             this.#setErrorCode(ErrorCodes.DataModelElementIsReadOnly)
-                            this.emit("call", "SetValue", [element, value], "false", true)
-                            return "false"
+                            return this.emitCall("SetValue", [element, value], "false")
                         } else if (error instanceof TypeMismatchError) {
                             this.#setErrorCode(ErrorCodes.DataModelElementTypeMismatch)
-                            this.emit("call", "SetValue", [element, value], "false", true)
-                            return "false"
+                            return this.emitCall("SetValue", [element, value], "false")
                         } else if (error instanceof InvalidPatternError) {
                             this.#setErrorCode(ErrorCodes.GeneralSetFailure)
-                            this.emit("call", "SetValue", [element, value], "false", true)
-                            return "false"
+                            return this.emitCall("SetValue", [element, value], "false")
                         } else if (error instanceof DuplicatedObjectiveIdError) {
                             this.#setErrorCode(ErrorCodes.GeneralSetFailure)
-                            this.emit("call", "SetValue", [element, value], "false", true)
-                            return "false"
+                            return this.emitCall("SetValue", [element, value], "false")
                         } else {
                             throw error
                         }
                     }
                 } else {
                     this.#setErrorCode(ErrorCodes.UndefinedDataModelElement)
-                    this.emit("call", "SetValue", [element, value], "false", true)
-                    return "false"
+                    return this.emitCall("SetValue", [element, value], "false")
                 }
             } catch (error) {
                 if (error instanceof OutOfBoundError) {
                     this.#setErrorCode(ErrorCodes.GeneralSetFailure)
-                    this.emit("call", "SetValue", [element, value], "false", true)
-                    return "false"
+                    return this.emitCall("SetValue", [element, value], "false")
                 } else if (error instanceof TargetNotCreatableError) {
                     this.#setErrorCode(ErrorCodes.DataModelDependencyNotEstablished)
-                    this.emit("call", "GetValue", [element], "", true)
-                    return "false"
+                    return this.emitCall("GetValue", [element], "false")
                 } else {
                     throw error
                 }
             }
         } else {
             this.#setErrorCode(ErrorCodes.UndefinedDataModelElement)
-            this.emit("call", "SetValue", [element, value], "false", true)
-            return "false"
+            return this.emitCall("SetValue", [element, value], "false")
         }
     }
 
     Commit(param) {
         if (param !== "") {
             this.#setErrorCode(ErrorCodes.GeneralArgumentError)
-            this.emit("call", "Commit", [param], "false", true)
-            return "false"
+            return this.emitCall("Commit", [param], "false")
         }
 
         if (this.state === "not-initialized") {
             this.#setErrorCode(ErrorCodes.CommitBeforeInitialization)
-            this.emit("call", "Commit", [param], "false", true)
-            return "false"
+            return this.emitCall("Commit", [param], "false")
         }
 
         if (this.state === "terminated") {
             this.#setErrorCode(ErrorCodes.CommitAfterTermination)
-            this.emit("call", "Commit", [param], "false", true)
-            return "false"
+            return this.emitCall("Commit", [param], "false")
         }
 
-        this.emit("persist", this.cmi.export())
-
         this.#setErrorCode(ErrorCodes.NoError)
-        this.emit("call", "Commit", [param], "true")
-        return "true"
+        return this.emitCall("Commit", [param], "true")
     }
 
     GetLastError() {
-        this.emit("call", "GetLastError", [], this.errorCode)
-        return this.errorCode
+        return this.emitCall("GetLastError", [], this.errorCode)
     }
 
     GetErrorString(errorCode) {
         const ErrorNames = Object.fromEntries(Object.entries(ErrorCodes).map(([k, v]) => [v, k]))
         const errorString = ErrorNames[errorCode] ?? `Unknown error code: ${errorCode}`
-        this.emit("call", "GetErrorString", [errorCode], errorString)
-        return errorString
+        return this.emitCall("GetErrorString", [errorCode], errorString)
     }
 
     GetDiagnostic(errorCode) {
-        this.emit("call", "GetDiagnostic", [errorCode], "")
-        return ""
+        return this.emitCall("GetDiagnostic", [errorCode], "")
     }
 }
