@@ -12,7 +12,6 @@ export default {
 
     entry: {
         main: "./src/index.js",
-        sw: "./src/sw.js"
     },
 
     output: {

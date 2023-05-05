@@ -10,7 +10,7 @@ export function manifest2cmi(manifest) {
     const defaultOrganizationId = organizations.getAttribute("default")
 
     const defaultOrganization = organizations.querySelector(
-        `organization[identifier=${defaultOrganizationId}]`)
+        `organization[identifier="${defaultOrganizationId}"]`)
 
     // TODO no multi-sco support
     const item = defaultOrganization.querySelector("item")
@@ -36,7 +36,7 @@ export function manifest2hrefs(manifest) {
     const defaultOrganizationId = organizations.getAttribute("default")
 
     const defaultOrganization = organizations.querySelector(
-        `organization[identifier=${defaultOrganizationId}]`)
+        `organization[identifier="${defaultOrganizationId}"]`)
 
     // TODO no multi-sco support
     const item = defaultOrganization.querySelector("item")
