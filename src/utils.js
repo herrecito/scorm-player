@@ -4,52 +4,106 @@ export async function sha256(uint8Array) {
     return hashArray.map(b => b.toString(16).padStart(2, "0")).join("")
 }
 
-// Creates a cmi value object from an manifest as an XML doc
-export function manifest2cmi(manifest) {
-    const organizations = manifest.querySelector("organizations")
-    const defaultOrganizationId = organizations.getAttribute("default")
-
-    const defaultOrganization = organizations.querySelector(
-        `organization[identifier="${defaultOrganizationId}"]`)
-
-    // TODO no multi-sco support
-    const item = defaultOrganization.querySelector("item")
-
-    const oids = []
-    const imsssObjectives = item.querySelector("objectives")
-    if (imsssObjectives) {
-        const objectives = imsssObjectives.querySelectorAll("objective")
-        for (const objective of objectives) {
-            const oid = objective.getAttribute("objectiveID")
-            oids.push(oid)
-        }
-    }
-
+function parseObjective(node) {
     return {
-        objectives: oids.map(id => ({ id }))
+        id: node.getAttribute("objectiveID")
     }
 }
 
-// Given a manifest as an XML doc, returns the main resource href, and the href of all items
-export function manifest2hrefs(manifest) {
-    const organizations = manifest.querySelector("organizations")
-    const defaultOrganizationId = organizations.getAttribute("default")
+function parsePrimaryObjective(node) {
+    return {
+        id: node.getAttribute("objectiveID")
+    }
+}
 
-    const defaultOrganization = organizations.querySelector(
-        `organization[identifier="${defaultOrganizationId}"]`)
+function parseSequencing(node) {
+    const objectives = node.querySelector("objectives")
+    const primaryObjective = node.querySelector("primaryObjective")
 
-    // TODO no multi-sco support
-    const item = defaultOrganization.querySelector("item")
+    return {
+        primaryObjective: primaryObjective ? parsePrimaryObjective(primaryObjective) : null,
+        objectives: Array.from(objectives?.querySelectorAll("objective") ?? []).map(parseObjective)
+    }
+}
 
-    const resourceId = item.getAttribute("identifierref")
+function parseItem(node) {
+    const sequencing = node.querySelector("sequencing")
 
-    const resources = manifest.querySelector("resources")
-    const resource = resources.querySelector(`resource[identifier=${resourceId}]`)
+    return {
+        identifier: node.getAttribute("identifier"),
+        identifierref: node.getAttribute("identifierref"),
+        parameters: node.getAttribute("parameters"),
+        title: node.querySelector("title").textContent,
+        sequencing: parseSequencing(sequencing),
+    }
+}
 
-    const href = resource.getAttribute("href")
-    const files = resource.querySelectorAll("file")
+function parseFile(node) {
+    return {
+        href: node.getAttribute("href"),
+    }
+}
 
-    return [href, Array.from(files).map(file => file.getAttribute("href"))]
+function parseResource(node) {
+    return {
+        identifier: node.getAttribute("identifier"),
+        type: node.getAttribute("type"),
+        href: node.getAttribute("href"),
+        files: Array.from(node.querySelectorAll("file")).map(parseFile),
+    }
+}
+
+function parseOrganization(node) {
+    const ogts = node.getAttribute("objectivesGlobalToSystem")
+    const sdgts = node.getAttribute("sharedDataGlobalToSystem")
+
+    return {
+        identifier: node.getAttribute("identifier"),
+        structure: node.getAttribute("structure") ?? "hierarchical",
+        title: node.querySelector("title").textContent,
+        items: Array.from(node.querySelectorAll("item")).map(parseItem),
+        objectivesGlobalToSystem: ogts ? ogts === "true" : true,
+        sharedDataGlobalToSystem: sdgts ? sdgts === "true" : true,
+    }
+}
+
+
+export function parseManifest(xmldoc) {
+    const manifest = xmldoc.querySelector("manifest")
+    const metadata = xmldoc.querySelector("metadata")
+    const organizations = xmldoc.querySelector("organizations")
+    const resources = xmldoc.querySelector("resources")
+
+    return {
+        identifier: manifest.getAttribute("identifier"),
+        version: manifest.getAttribute("version"),
+        metadata: {
+            schema: metadata.querySelector("schema").textContent,
+            schemaversion: metadata.querySelector("schemaversion").textContent,
+            location: metadata.querySelector("location")?.textContent,
+        },
+        organizations: Array.from(organizations.querySelectorAll("organization")).map(parseOrganization),
+        resources: Array.from(resources.querySelectorAll("resource")).map(parseResource),
+        defaultOrganizationId: organizations.getAttribute("default"),
+    }
+}
+
+export function item2cmi(item) {
+    const objectives = []
+    if (item.sequencing.primaryObjective) {
+        objectives.push({
+            id: item.sequencing.primaryObjective.id
+        })
+    }
+    for (const objective of item.sequencing.objectives) {
+        objectives.push({
+            id: objective.id
+        })
+    }
+
+    return {
+        objectives
+    }
 }
 
 export function initialEntryValue(cmi, suspendAll=false) {
@@ -58,4 +112,42 @@ export function initialEntryValue(cmi, suspendAll=false) {
     if (cmi.exit === "logout") return "ab-initio"
     if (suspendAll) return "resume"
     return ""
+}
+
+export function parseBoolean(str) {
+    if (str === "true") {
+        return true
+    } else if (str === "false") {
+        return false
+    } else {
+        throw new Error(`Unknown boolean: ${str}`)
+    }
+}
+
+export function parseDelimiter(str) {
+    const [name, value] = str.slice(1, -1).split("=")
+
+    return {
+        name, 
+        value
+    }
+}
+
+export function parseCharacterString(str) {
+    let delimiters = {}
+
+    let i = 0
+    while (str[i] === "{") {
+        let j = i+1
+        while (j < str.length) {
+            if (str[j] === "}") break
+            j += 1
+        }
+        if (str[j] !== "}") break // No closing '}' found
+        const { name, value } = parseDelimiter(str.slice(i, j+1))
+        delimiters[name] = value
+        i = j+1        
+    }
+
+    return { str: str.slice(i), delimiters }
 }

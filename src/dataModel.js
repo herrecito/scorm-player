@@ -100,12 +100,12 @@ function Collection(Element) {
         access(path, write) {
             const [name, ...rest] = path
             switch (name) {
-                case "_count": {
+                case "_count": { // integer
                     const value = this.items.length.toString()
                     return new (ReadOnly(SimpleElement))(value)
                 }
 
-                case "_children": {
+                case "_children": { // characterstring
                     const value = Element.children.join(",")
                     return new (ReadOnly(SimpleElement))(value)
                 }
@@ -243,15 +243,15 @@ class CompletionStatus extends DefaultValue(Enum(["completed", "incomplete", "no
 class SuccessStatus extends DefaultValue(Enum(["passed", "failed", "unknown"]), "unknown") {}
 
 class CommentFromLearner extends Aggregate({
-    comment:   Creatable(SimpleElement),
-    location:  Creatable(SimpleElement),
-    timestamp: Creatable(TimestampElement),
+    comment:   Creatable(SimpleElement), // localized_string_type
+    location:  Creatable(SimpleElement), // characterstring
+    timestamp: Creatable(TimestampElement), // time
 }) {}
 
 class CommentFromLms extends Aggregate({
-    comment:   ReadOnly(SimpleElement),
-    location:  ReadOnly(SimpleElement),
-    timestamp: ReadOnly(TimestampElement),
+    comment:   ReadOnly(SimpleElement), // localized_string_type
+    location:  ReadOnly(SimpleElement), // characterstring
+    timestamp: ReadOnly(TimestampElement), // time
 }) {}
 
 
@@ -265,7 +265,7 @@ class InteractionObjectiveId extends SimpleElement {
     setValue(value) {
         const interactionObjective = this.parent
         const objectives = interactionObjective.parent
-        if (objectives.export().some(o => o.id === value)) {
+        if (objectives.export().some(o => o.id === value)) { // TODO don't use export
             throw new DuplicatedObjectiveIdError()
         }
 
@@ -282,7 +282,7 @@ class Pattern extends Creatable(SimpleElement) {
         const correctResponse = this.parent
         const correctResponses = correctResponse.parent
         const interaction = correctResponses.parent
-        const type = interaction.type.export()
+        const type = interaction.type.export() // TODO don't use export
         if (!type) throw new TargetNotCreatableError()
 
         switch (type) {
@@ -332,14 +332,14 @@ class Exit extends WriteOnly(Enum(["time-out", "suspend", "logout", "normal", ""
 class Mode extends ReadOnly(DefaultValue(Enum(["browse", "normal", "review"]), "normal")) {}
 
 export class CMI extends Aggregate({
-    _version: ReadOnly(DefaultValue(SimpleElement, "1.0")),
+    _version: ReadOnly(DefaultValue(SimpleElement, "1.0")), // characterstring
     comments_from_learner: Collection(CommentFromLearner),
     comments_from_lms: Collection(CommentFromLms),
-    completion_status: CompletionStatus,
-    completion_threshold: CompletionThreshold,
-    credit: Credit,
-    entry: Entry,
-    exit: Exit,
+    completion_status: CompletionStatus, // state
+    completion_threshold: CompletionThreshold, // real [0, 1]
+    credit: Credit, // state
+    entry: Entry, // state
+    exit: Exit, // state
     interactions: Collection(Interaction),
     location: SimpleElement,
     mode: Mode,

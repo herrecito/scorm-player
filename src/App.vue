@@ -55,6 +55,7 @@
 </template>
 
 <script>
+import { markRaw } from "vue"
 import uniqueId from "lodash/uniqueId"
 import * as zip from "@zip.js/zip.js"
 
@@ -66,19 +67,48 @@ import CmiHistoryLocalStore from "./CmiHistoryLocalStore.js"
 import API from "./API.js"
 import {
     sha256,
-    manifest2cmi,
-    manifest2hrefs,
+    item2cmi,
+    parseManifest,
     initialEntryValue,
 } from "./utils.js"
+
+async function swPostMessage(...args) {
+    await navigator.serviceWorker.ready.then(registration => {
+        registration.active.postMessage(...args)
+    })
+}
 
 export default {
     data() {
         return {
             iframeSrc: "",
-            iframeKey: uniqueId(),
+            iframeKey: uniqueId("iframe"),
             eventLog: [],
             now: Date.now(),
+
+            _fileHash: null, // TODO
+            _reader: null, // TODO
         }
+    },
+
+    async created() {
+        navigator.serviceWorker.register(new URL("./sw.js", import.meta.url))
+        // TODO different message types
+        navigator.serviceWorker.addEventListener("message", async event => {
+            const message = event.data
+            const { callbackId, filename } = message
+            const entries = await this._reader.getEntries()
+            const entry = entries.find(e => e.filename === filename)
+            const cache = await caches.open(this._fileHash)
+            try {
+                const data = await entry.getData(new zip.Uint8ArrayWriter)
+                cache.put(`/zip/${this._fileHash}/${entry.filename}`, new Response(data))
+                await swPostMessage({ type: "response", callbackId, data }, [data.buffer])
+            } catch (error) {
+                await swPostMessage({ type: "not-found", callbackId })
+                throw error
+            }
+        })
     },
 
     mounted() {
@@ -92,77 +122,57 @@ export default {
     },
 
     methods: {
-        unload() {
+        async unload() {
             this.iframeSrc = ""
+            this.iframeKey = uniqueId()
+            await this.$nextTick()
+            this.eventLog = []
+            await this._reader?.close()
         },
 
         async onSubmit() {
             const file = this.$refs.inputFile.files[0]
             if (!file) return
 
-            {
-                // Unmount previous iframe and wait for it to do its things
-                this.iframeSrc = ""
-                this.iframeKey = uniqueId()
-                await this.$nextTick()
-            }
+            await this.unload()
 
-            this.eventLog = []
-
+            // Read Zip
             const data = await file.arrayBuffer()
+            const fileHash = await sha256(data)
             const reader = new zip.ZipReader(new zip.BlobReader(file))
+            this._reader = markRaw(reader)
+            this._fileHash = fileHash
             const entries = await reader.getEntries()
 
+            // Find manifest
             const imsManifestEntry = entries.find(e => e.filename === "imsmanifest.xml")
             if (!imsManifestEntry) throw new Error(`Couldn't find imsmanifest.xml`)
-
             const imsManifestText = await imsManifestEntry.getData(new zip.TextWriter())
+            const imsManifest = new DOMParser().parseFromString(imsManifestText, "text/xml")
+            const manifest = parseManifest(imsManifest)
 
-            const parser = new DOMParser()
-            const imsManifest = parser.parseFromString(imsManifestText, "text/xml")
+            // Register package content with SW
+            for (const entry of entries) {
+                if (entry.directory) continue
+                await swPostMessage({ type: "origin", fileHash })
+            }
 
-            const [href, hrefs] = manifest2hrefs(imsManifest)
-            // TODO isEazy SCORMs don't list all files on the manifest,
-            // so we just put everything in the zip in the SW cache...
-            /*
-            await Promise.all(hrefs.map(async href => {
-                const entry = entries.find(e => e.filename === href)
-                const data = await entry.getData(new zip.Uint8ArrayWriter)
-
-                await navigator.serviceWorker.ready.then(registration => {
-                    registration.active.postMessage({
-                        type: "put",
-                        url: href,
-                        body: data
-                    }, [data.buffer])
-                })
-            }))
-            */
-            await Promise.all(entries.map(async entry => {
-                if (entry.directory) return
-
-                const data = await entry.getData(new zip.Uint8ArrayWriter)
-
-                await navigator.serviceWorker.ready.then(registration => {
-                    registration.active.postMessage({
-                        type: "put",
-                        url: entry.filename,
-                        body: data
-                    }, [data.buffer])
-                })
-            }))
-            await reader.close()
+            // Get item to launch
+            const defaultOrganization = manifest.organizations.find(organization => {
+                return organization.identifier === manifest.defaultOrganizationId
+            })
+            const item = defaultOrganization.items[0]
 
             // Retrieve CMI from the last entry on the history, or create a new one from the manifest
-            const store = new CmiHistoryLocalStore(await sha256(data))
+            const store = new CmiHistoryLocalStore(fileHash)
             const lastEntry = await store.last()
-            const cmi = lastEntry?.cmi ?? manifest2cmi(imsManifest)
+            const cmi = lastEntry?.cmi ?? item2cmi(item)
 
+            // Init API
             const api = new API({
                 ...cmi,
                 entry: initialEntryValue(lastEntry?.cmi)
             })
-
             api.on("call", async (functionName, args, returnValue) => {
                 this.eventLog.unshift({
                     key: uniqueId(),
@@ -185,8 +195,9 @@ export default {
             })
 
             // Set API and iframe source
+            const resource = manifest.resources.find(r => r.identifier === item.identifierref)
             window.API_1484_11 = api
-            this.iframeSrc = href
+            this.iframeSrc = `/zip/${fileHash}/${resource.href}`
             this.iframeKey = uniqueId()
             this.eventLog.unshift({
                 key: uniqueId(),

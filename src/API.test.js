@@ -2,27 +2,6 @@ import { assert } from "chai"
 
 import API from "./API.js"
 
-class CharacterStringParser {
-    constructor(str) {
-        // TODO
-    }
-}
-
-function parseCharacterString(str) {
-    return str
-}
-
-describe.skip("parseCharacterString", () => {
-    it("works", () => {
-        const result = parseCharacterString("{lang=en}Characterstring in the English language")
-        assert.strictEqual(result, [
-            "Characterstring in the English language", [
-                ["lang", "en"]
-            ]
-        ])
-    })
-})
-
 describe("API", () => {
     describe("Initialize", () => {
         it("works", () => {
